@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>授業記録シート</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<style>
+* { box-sizing: border-box; }
+
+/* ===== Theme variables (default = bright) ===== */
+body, body.theme-bright {
+  --bg: #FFF6E5;
+  --panel-bg: #FFFFFF;
+  --panel-border: #FFB74D;
+  --text: #3E2723;
+  --text-muted: #795548;
+  --btn-bg: #FFFFFF;
+  --btn-border: #FFB74D;
+  --btn-text: #5D4037;
+  --btn-primary-bg: #FF7043;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #F4511E;
+  --btn-secondary-bg: #FFB74D;
+  --btn-secondary-text: #3E2723;
+  --th-bg: #FFCC80;
+  --th-text: #3E2723;
+  --td-bg: #FFFFFF;
+  --td-border: #FFB74D;
+  --input-bg: #FFFFFF;
+  --input-border: #FFB74D;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(62, 39, 35, 0.55);
+  --highlight: #FFFDE7;
+  --header-bg: linear-gradient(135deg, #FFCC80, #FFB74D);
+  --shadow: 0 2px 8px rgba(255, 112, 67, 0.18);
+}
+body.theme-dark {
+  --bg: #121212;
+  --panel-bg: #1E1E1E;
+  --panel-border: #424242;
+  --text: #E0E0E0;
+  --text-muted: #9E9E9E;
+  --btn-bg: #2A2A2A;
+  --btn-border: #555555;
+  --btn-text: #E0E0E0;
+  --btn-primary-bg: #1976D2;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #1565C0;
+  --btn-secondary-bg: #424242;
+  --btn-secondary-text: #E0E0E0;
+  --th-bg: #2D2D2D;
+  --th-text: #E0E0E0;
+  --td-bg: #1E1E1E;
+  --td-border: #444444;
+  --input-bg: #2A2A2A;
+  --input-border: #555555;
+  --modal-bg: #2A2A2A;
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --highlight: #424242;
+  --header-bg: linear-gradient(135deg, #1E1E1E, #2D2D2D);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+body.theme-natural {
+  --bg: #F5EFE0;
+  --panel-bg: #FFFFFF;
+  --panel-border: #A1887F;
+  --text: #3E2723;
+  --text-muted: #6D4C41;
+  --btn-bg: #FFFFFF;
+  --btn-border: #A1887F;
+  --btn-text: #4E342E;
+  --btn-primary-bg: #8D6E63;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #6D4C41;
+  --btn-secondary-bg: #BCAAA4;
+  --btn-secondary-text: #3E2723;
+  --th-bg: #BCAAA4;
+  --th-text: #3E2723;
+  --td-bg: #FFFFFF;
+  --td-border: #A1887F;
+  --input-bg: #FFFFFF;
+  --input-border: #A1887F;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(62, 39, 35, 0.55);
+  --highlight: #FFF8E1;
+  --header-bg: linear-gradient(135deg, #BCAAA4, #A1887F);
+  --shadow: 0 2px 8px rgba(141, 110, 99, 0.25);
+}
+body.theme-pop {
+  --bg: #FFE0F0;
+  --panel-bg: #FFFFFF;
+  --panel-border: #EC407A;
+  --text: #4A148C;
+  --text-muted: #7B1FA2;
+  --btn-bg: #FFFFFF;
+  --btn-border: #EC407A;
+  --btn-text: #C2185B;
+  --btn-primary-bg: #E91E63;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #C2185B;
+  --btn-secondary-bg: #BA68C8;
+  --btn-secondary-text: #FFFFFF;
+  --th-bg: #F8BBD0;
+  --th-text: #4A148C;
+  --td-bg: #FFFFFF;
+  --td-border: #EC407A;
+  --input-bg: #FFFFFF;
+  --input-border: #EC407A;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(74, 20, 140, 0.5);
+  --highlight: #F3E5F5;
+  --header-bg: linear-gradient(135deg, #F8BBD0, #CE93D8);
+  --shadow: 0 2px 12px rgba(233, 30, 99, 0.25);
+}
+body.theme-simple {
+  --bg: #FAFAFA;
+  --panel-bg: #FFFFFF;
+  --panel-border: #BDBDBD;
+  --text: #212121;
+  --text-muted: #757575;
+  --btn-bg: #FFFFFF;
+  --btn-border: #BDBDBD;
+  --btn-text: #424242;
+  --btn-primary-bg: #424242;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #212121;
+  --btn-secondary-bg: #E0E0E0;
+  --btn-secondary-text: #212121;
+  --th-bg: #EEEEEE;
+  --th-text: #212121;
+  --td-bg: #FFFFFF;
+  --td-border: #BDBDBD;
+  --input-bg: #FFFFFF;
+  --input-border: #BDBDBD;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(0,0,0,0.5);
+  --highlight: #F5F5F5;
+  --header-bg: #FFFFFF;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+body.theme-classic {
+  --bg: #F4ECD8;
+  --panel-bg: #FFFBF0;
+  --panel-border: #8D6E63;
+  --text: #3E2723;
+  --text-muted: #5D4037;
+  --btn-bg: #FFFBF0;
+  --btn-border: #8D6E63;
+  --btn-text: #4E342E;
+  --btn-primary-bg: #6D4C41;
+  --btn-primary-text: #FFFBF0;
+  --btn-primary-hover: #5D4037;
+  --btn-secondary-bg: #D7CCC8;
+  --btn-secondary-text: #3E2723;
+  --th-bg: #D7CCC8;
+  --th-text: #3E2723;
+  --td-bg: #FFFBF0;
+  --td-border: #8D6E63;
+  --input-bg: #FFFBF0;
+  --input-border: #8D6E63;
+  --modal-bg: #FFFBF0;
+  --modal-overlay: rgba(62, 39, 35, 0.55);
+  --highlight: #FFF8E1;
+  --header-bg: linear-gradient(135deg, #D7CCC8, #BCAAA4);
+  --shadow: 0 2px 8px rgba(109, 76, 65, 0.25);
+}
+body.theme-pastel {
+  --bg: #F0F4E8;
+  --panel-bg: #FFFFFF;
+  --panel-border: #AED581;
+  --text: #33691E;
+  --text-muted: #558B2F;
+  --btn-bg: #FFFFFF;
+  --btn-border: #AED581;
+  --btn-text: #558B2F;
+  --btn-primary-bg: #9CCC65;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #7CB342;
+  --btn-secondary-bg: #C5E1A5;
+  --btn-secondary-text: #33691E;
+  --th-bg: #DCEDC8;
+  --th-text: #33691E;
+  --td-bg: #FFFFFF;
+  --td-border: #AED581;
+  --input-bg: #FFFFFF;
+  --input-border: #AED581;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(51, 105, 30, 0.4);
+  --highlight: #F1F8E9;
+  --header-bg: linear-gradient(135deg, #DCEDC8, #FFCCBC);
+  --shadow: 0 2px 8px rgba(156, 204, 101, 0.25);
+}
+body.theme-ocean {
+  --bg: #E1F5FE;
+  --panel-bg: #FFFFFF;
+  --panel-border: #29B6F6;
+  --text: #01579B;
+  --text-muted: #0277BD;
+  --btn-bg: #FFFFFF;
+  --btn-border: #29B6F6;
+  --btn-text: #0277BD;
+  --btn-primary-bg: #0288D1;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #01579B;
+  --btn-secondary-bg: #81D4FA;
+  --btn-secondary-text: #01579B;
+  --th-bg: #B3E5FC;
+  --th-text: #01579B;
+  --td-bg: #FFFFFF;
+  --td-border: #29B6F6;
+  --input-bg: #FFFFFF;
+  --input-border: #29B6F6;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(1, 87, 155, 0.5);
+  --highlight: #E1F5FE;
+  --header-bg: linear-gradient(135deg, #81D4FA, #4FC3F7);
+  --shadow: 0 2px 8px rgba(2, 136, 209, 0.25);
+}
+body.theme-forest {
+  --bg: #E8F5E9;
+  --panel-bg: #FFFFFF;
+  --panel-border: #66BB6A;
+  --text: #1B5E20;
+  --text-muted: #2E7D32;
+  --btn-bg: #FFFFFF;
+  --btn-border: #66BB6A;
+  --btn-text: #2E7D32;
+  --btn-primary-bg: #2E7D32;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #1B5E20;
+  --btn-secondary-bg: #A5D6A7;
+  --btn-secondary-text: #1B5E20;
+  --th-bg: #C8E6C9;
+  --th-text: #1B5E20;
+  --td-bg: #FFFFFF;
+  --td-border: #66BB6A;
+  --input-bg: #FFFFFF;
+  --input-border: #66BB6A;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(27, 94, 32, 0.5);
+  --highlight: #F1F8E9;
+  --header-bg: linear-gradient(135deg, #A5D6A7, #81C784);
+  --shadow: 0 2px 8px rgba(46, 125, 50, 0.25);
+}
+body.theme-mono {
+  --bg: #FFFFFF;
+  --panel-bg: #FFFFFF;
+  --panel-border: #000000;
+  --text: #000000;
+  --text-muted: #424242;
+  --btn-bg: #FFFFFF;
+  --btn-border: #000000;
+  --btn-text: #000000;
+  --btn-primary-bg: #000000;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #424242;
+  --btn-secondary-bg: #E0E0E0;
+  --btn-secondary-text: #000000;
+  --th-bg: #000000;
+  --th-text: #FFFFFF;
+  --td-bg: #FFFFFF;
+  --td-border: #000000;
+  --input-bg: #FFFFFF;
+  --input-border: #000000;
+  --modal-bg: #FFFFFF;
+  --modal-overlay: rgba(0,0,0,0.6);
+  --highlight: #F5F5F5;
+  --header-bg: #000000;
+  --shadow: 0 0 0 2px #000000;
+}
+
+/* ===== Layout ===== */
+body {
+  font-family: "Yu Gothic", "Meiryo", sans-serif;
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+}
+.header {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--header-bg);
+  padding: 14px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+}
+.header label {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.header label > input { flex-shrink: 0; }
+.header input {
+  padding: 6px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: normal;
+  background: var(--input-bg);
+  color: var(--text);
+}
+.header input.lesson { width: 230px; }
+.header input.class { width: 140px; }
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.toolbar button {
+  padding: 8px 14px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: filter .12s, transform .05s;
+}
+.toolbar button:hover { filter: brightness(0.95); }
+.toolbar button:active { transform: translateY(1px); }
+.toolbar button.primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--btn-primary-bg);
+}
+.toolbar button.primary:hover { background: var(--btn-primary-hover); border-color: var(--btn-primary-hover); }
+.toolbar button.secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border-color: var(--btn-secondary-bg);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel-bg);
+  table-layout: fixed;
+  box-shadow: var(--shadow);
+  border-radius: 6px;
+  overflow: hidden;
+}
+th, td {
+  border: 1px solid var(--td-border);
+  padding: 6px 8px;
+  vertical-align: top;
+  font-size: 14px;
+  background: var(--td-bg);
+  color: var(--text);
+}
+th {
+  background: var(--th-bg);
+  color: var(--th-text);
+  font-weight: bold;
+  text-align: center;
+}
+th.col-time, td.col-time { width: 90px; }
+th.col-sym, td.col-sym { width: 60px; }
+
+.cell-time {
+  width: 100%;
+  border: none;
+  font-family: "Consolas", monospace;
+  font-size: 14px;
+  background: transparent;
+  text-align: center;
+  color: inherit;
+}
+.cell-time:focus { outline: 1px solid var(--btn-primary-bg); }
+
+.cell-sym {
+  width: 100%;
+  border: none;
+  font-size: 18px;
+  text-align: center;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+.cell-sym:focus { outline: 1px solid var(--btn-primary-bg); }
+
+.rec-cell-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.cell-rec {
+  flex: 1;
+  min-height: 22px;
+  outline: none;
+  font-size: 14px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  color: inherit;
+}
+.cell-rec:focus { background: var(--highlight); }
+.img-wrap {
+  display: inline-block;
+  position: relative;
+  margin: 4px 10px 4px 0;
+  vertical-align: middle;
+}
+.img-wrap img {
+  max-width: 220px;
+  max-height: 160px;
+  border: 1px solid var(--td-border);
+  border-radius: 2px;
+  display: block;
+}
+.img-del {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d33;
+  color: white;
+  border: 2px solid white;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.img-del:hover { background: #b00; }
+.btn-photo {
+  padding: 2px 8px;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--btn-text);
+}
+.btn-photo:hover { filter: brightness(0.95); }
+
+/* Symbol row colors are FIXED across themes */
+tr.sym-light-pink td { background: #FCE4EC; color: #1a1a1a; }
+tr.sym-dark-pink td { background: #F48FB1; color: #1a1a1a; }
+tr.sym-white td { /* uses theme default */ }
+tr.sym-light-blue td { background: #E1F5FE; color: #1a1a1a; }
+tr.sym-dark-blue td { background: #81D4FA; color: #1a1a1a; }
+tr.sym-light-pink td input, tr.sym-dark-pink td input,
+tr.sym-light-blue td input, tr.sym-dark-blue td input,
+tr.sym-light-pink td select, tr.sym-dark-pink td select,
+tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
+
+#row-sentinel { height: 1px; }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--modal-overlay);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--modal-bg);
+  color: var(--text);
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 700px;
+  width: 92%;
+  max-height: 88vh;
+  overflow-y: auto;
+  line-height: 1.6;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.modal-header h3 { margin: 0; }
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 8px;
+}
+.modal-close:hover { color: var(--text); }
+.modal-section { margin-bottom: 20px; }
+.modal-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 15px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 4px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+/* Theme grid */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.theme-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  background: var(--btn-bg);
+  border: 2px solid var(--btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  transition: transform .1s;
+}
+.theme-btn:hover { transform: translateY(-2px); }
+.theme-btn.active {
+  border-color: var(--btn-primary-bg);
+  border-width: 3px;
+  background: var(--highlight);
+}
+.theme-preview {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+/* History list */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.history-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+  font-style: italic;
+}
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  flex: 1;
+}
+.history-date { font-weight: bold; font-size: 14px; }
+.history-lesson { font-size: 14px; }
+.history-class { font-size: 13px; color: var(--text-muted); }
+.history-rows { font-size: 12px; color: var(--text-muted); }
+.history-actions {
+  display: flex;
+  gap: 6px;
+}
+.history-actions button {
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  color: var(--btn-text);
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.history-actions button.edit { color: var(--btn-primary-bg); }
+.history-actions button.del { color: #d33; }
+.history-actions button:hover { filter: brightness(0.95); }
+
+.note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.modal-actions button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.modal-actions button.primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--btn-primary-bg);
+}
+
+/* ===== Print + PDF export ===== */
+@media print {
+  body { background: white; padding: 0; color: #000; }
+  .toolbar, .btn-photo, .img-del { display: none !important; }
+  .header {
+    border: none;
+    padding: 0 0 8px 0;
+    background: white !important;
+    box-shadow: none;
+  }
+  .header input {
+    border: none;
+    padding: 0;
+    background: transparent;
+    color: #000;
+  }
+  table {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    box-shadow: none;
+  }
+  tr { page-break-inside: avoid; }
+  tr.empty-row { display: none !important; }
+  .cell-rec img { max-width: 140px; max-height: 100px; }
+  .cell-rec:focus { background: transparent; }
+  th, td { color: #000; }
+}
+body.exporting-pdf .toolbar,
+body.exporting-pdf .btn-photo,
+body.exporting-pdf .img-del { display: none !important; }
+body.exporting-pdf tr.empty-row { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <label>日付 <input type="date" id="hdr-date"></label>
+  <label>授業 <input type="text" id="hdr-lesson" class="lesson" placeholder="例：国語「ごんぎつね」"></label>
+  <label>学級 <input type="text" id="hdr-class" class="class" placeholder="例：4年1組"></label>
+</div>
+
+<div class="toolbar">
+  <button class="primary" onclick="doPrint()">印刷</button>
+  <button class="primary" onclick="exportExcel()">Excel保存</button>
+  <button class="primary" onclick="exportPDF()">PDF保存</button>
+  <button onclick="exportJSON()">JSON保存</button>
+  <button onclick="document.getElementById('json-input').click()">JSON読込</button>
+  <button class="secondary" onclick="newEntryConfirm()">新規作成</button>
+  <button class="secondary" onclick="openHistory()">履歴</button>
+  <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
+</div>
+
+<table id="rec-table">
+  <thead>
+    <tr>
+      <th class="col-time">時刻</th>
+      <th class="col-sym">記号</th>
+      <th class="col-rec">記録</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+<div id="row-sentinel"></div>
+
+<!-- History / Theme modal -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>履歴 / テーマ設定</h3>
+      <button class="modal-close" onclick="closeHistory()" title="閉じる">×</button>
+    </div>
+
+    <div class="modal-section">
+      <h4>テーマ</h4>
+      <div class="theme-grid" id="theme-grid"></div>
+    </div>
+
+    <div class="modal-section">
+      <h4>保存された授業記録</h4>
+      <div class="history-list" id="history-list"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button onclick="closeHistory()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'lessonRecord_v2';
+const OLD_STORAGE_KEY = 'lessonRecord_v1';
+const INITIAL_ROWS = 20;
+const ROWS_PER_TRIGGER = 10;
+const MAX_ROWS = 500;
+
+const SYMBOLS = ['', '◯', '⬤', '☆', '★'];
+const DELETE_OPTION = '__DELETE__';
+const SYM_CLASS = {
+  '': 'sym-white',
+  '◯': 'sym-light-pink',
+  '⬤': 'sym-dark-pink',
+  '●': 'sym-dark-pink',
+  '・': 'sym-white',
+  '☆': 'sym-light-blue',
+  '★': 'sym-dark-blue'
+};
+const SYM_COLOR_HEX = {
+  '◯': 'FCE4EC',
+  '⬤': 'F48FB1',
+  '●': 'F48FB1',
+  '☆': 'E1F5FE',
+  '★': '81D4FA'
+};
+
+const THEMES = [
+  { id: 'bright',   name: 'ブライト',   preview: 'linear-gradient(135deg, #FFCC80, #FF7043)' },
+  { id: 'dark',     name: 'ダーク',     preview: 'linear-gradient(135deg, #424242, #1E1E1E)' },
+  { id: 'natural',  name: 'ナチュラル', preview: 'linear-gradient(135deg, #BCAAA4, #8D6E63)' },
+  { id: 'pop',      name: 'ポップ',     preview: 'linear-gradient(135deg, #F8BBD0, #E91E63)' },
+  { id: 'simple',   name: 'シンプル',   preview: 'linear-gradient(135deg, #FAFAFA, #BDBDBD)' },
+  { id: 'classic',  name: 'クラシック', preview: 'linear-gradient(135deg, #D7CCC8, #6D4C41)' },
+  { id: 'pastel',   name: 'パステル',   preview: 'linear-gradient(135deg, #DCEDC8, #FFCCBC)' },
+  { id: 'ocean',    name: 'オーシャン', preview: 'linear-gradient(135deg, #81D4FA, #0288D1)' },
+  { id: 'forest',   name: 'フォレスト', preview: 'linear-gradient(135deg, #A5D6A7, #2E7D32)' },
+  { id: 'mono',     name: 'モノクロ',   preview: 'linear-gradient(135deg, #FFFFFF, #000000)' }
+];
+
+let state = { currentId: null, entries: [], theme: 'bright' };
+
+/* ===== Utils ===== */
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+function nowTime() {
+  const d = new Date();
+  return [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map(n => String(n).padStart(2, '0')).join(':');
+}
+function newRow() {
+  return { time: '', symbol: '', text: '', images: [], timestamped: false };
+}
+function makeEmptyEntry(id) {
+  return {
+    id: id || generateId(),
+    savedAt: new Date().toISOString(),
+    header: { date: todayISO(), lesson: '', class: '' },
+    rows: Array.from({ length: INITIAL_ROWS }, newRow)
+  };
+}
+function getCurrentEntry() {
+  return state.entries.find(e => e.id === state.currentId);
+}
+function isEntryEmpty(entry) {
+  if (!entry) return true;
+  const h = entry.header || {};
+  if ((h.lesson || '').trim() || (h.class || '').trim()) return false;
+  return (entry.rows || []).every(r =>
+    !r.time && !r.symbol && !(r.text || '').trim() && (!r.images || r.images.length === 0)
+  );
+}
+function isRowEmpty(r) {
+  return !r.time && !r.symbol && !(r.text || '').trim() && (!r.images || r.images.length === 0);
+}
+
+/* ===== Persistence ===== */
+function loadAppState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && obj.entries && obj.currentId) {
+        state = obj;
+        normalizeState();
+        return;
+      }
+    }
+  } catch (e) { console.warn(e); }
+
+  // Migrate v1 if present
+  try {
+    const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+    if (oldRaw) {
+      const old = JSON.parse(oldRaw);
+      if (old && old.rows) {
+        const id = generateId();
+        state = {
+          currentId: id,
+          entries: [{
+            id,
+            savedAt: new Date().toISOString(),
+            header: old.header || { date: todayISO(), lesson: '', class: '' },
+            rows: old.rows
+          }],
+          theme: 'bright'
+        };
+        normalizeState();
+        saveState();
+        return;
+      }
+    }
+  } catch (e) { console.warn(e); }
+
+  const id = generateId();
+  state = { currentId: id, entries: [makeEmptyEntry(id)], theme: 'bright' };
+}
+function normalizeState() {
+  if (!state.theme || !THEMES.find(t => t.id === state.theme)) state.theme = 'bright';
+  if (!Array.isArray(state.entries)) state.entries = [];
+  state.entries.forEach(entry => {
+    if (!entry.id) entry.id = generateId();
+    if (!entry.header) entry.header = { date: todayISO(), lesson: '', class: '' };
+    if (!Array.isArray(entry.rows)) entry.rows = [];
+    entry.rows.forEach(r => {
+      if (typeof r.text !== 'string') r.text = '';
+      if (!Array.isArray(r.images)) r.images = [];
+      if (typeof r.symbol !== 'string') r.symbol = '';
+      if (typeof r.time !== 'string') r.time = '';
+      if (typeof r.timestamped !== 'boolean') r.timestamped = !!r.time;
+      if (r.symbol === '●') r.symbol = '⬤';
+      if (r.symbol === '・') r.symbol = '';
+    });
+    while (entry.rows.length < INITIAL_ROWS) entry.rows.push(newRow());
+  });
+  if (!state.entries.find(e => e.id === state.currentId)) {
+    if (state.entries.length > 0) state.currentId = state.entries[0].id;
+    else {
+      const id = generateId();
+      state.entries.push(makeEmptyEntry(id));
+      state.currentId = id;
+    }
+  }
+}
+function saveState() {
+  const cur = getCurrentEntry();
+  if (cur) cur.savedAt = new Date().toISOString();
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('保存失敗（容量超過の可能性）:', e);
+  }
+}
+
+/* ===== Theme ===== */
+function applyTheme(themeId) {
+  const valid = THEMES.find(t => t.id === themeId) ? themeId : 'bright';
+  document.body.className = 'theme-' + valid;
+  state.theme = valid;
+}
+function renderThemeGrid() {
+  const grid = document.getElementById('theme-grid');
+  grid.innerHTML = '';
+  THEMES.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'theme-btn' + (state.theme === t.id ? ' active' : '');
+    btn.innerHTML =
+      `<div class="theme-preview" style="background:${t.preview}"></div>` +
+      `<span>${t.name}</span>`;
+    btn.addEventListener('click', () => {
+      applyTheme(t.id);
+      saveState();
+      renderThemeGrid();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+/* ===== Header binding ===== */
+function renderHeader() {
+  const cur = getCurrentEntry();
+  document.getElementById('hdr-date').value = cur.header.date || '';
+  document.getElementById('hdr-lesson').value = cur.header.lesson || '';
+  document.getElementById('hdr-class').value = cur.header.class || '';
+}
+function bindHeaderInputs() {
+  ['date', 'lesson', 'class'].forEach(key => {
+    const el = document.getElementById('hdr-' + key);
+    el.addEventListener('input', e => {
+      const cur = getCurrentEntry();
+      cur.header[key] = e.target.value;
+      saveState();
+    });
+  });
+}
+
+/* ===== Table rendering ===== */
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  const cur = getCurrentEntry();
+  cur.rows.forEach((row, i) => {
+    tbody.appendChild(buildRowEl(row, i));
+  });
+}
+function buildRowEl(row, idx) {
+  const tr = document.createElement('tr');
+  tr.dataset.idx = idx;
+  applyRowColor(tr, row.symbol);
+
+  // Time
+  const tdTime = document.createElement('td');
+  tdTime.className = 'col-time';
+  const inpTime = document.createElement('input');
+  inpTime.type = 'text';
+  inpTime.className = 'cell-time';
+  inpTime.value = row.time;
+  inpTime.placeholder = '--:--:--';
+  inpTime.addEventListener('input', e => {
+    row.time = e.target.value;
+    if (e.target.value) row.timestamped = true;
+    saveState();
+  });
+  inpTime.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tr.querySelector('.cell-rec').focus();
+    }
+  });
+  tdTime.appendChild(inpTime);
+  tr.appendChild(tdTime);
+
+  // Symbol
+  const tdSym = document.createElement('td');
+  tdSym.className = 'col-sym';
+  const sel = document.createElement('select');
+  sel.className = 'cell-sym';
+  SYMBOLS.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s === '' ? '—' : s;
+    sel.appendChild(opt);
+  });
+  const delOpt = document.createElement('option');
+  delOpt.value = DELETE_OPTION;
+  delOpt.textContent = '削除';
+  delOpt.style.color = '#d33';
+  sel.appendChild(delOpt);
+  sel.value = row.symbol || '';
+  sel.addEventListener('change', e => {
+    if (e.target.value === DELETE_OPTION) {
+      if (confirm('このセルだけ削除します。よろしいですか？')) {
+        deleteRow(parseInt(tr.dataset.idx, 10));
+      } else {
+        e.target.value = row.symbol || '';
+      }
+      return;
+    }
+    row.symbol = e.target.value;
+    applyRowColor(tr, row.symbol);
+    saveState();
+  });
+  sel.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tr.querySelector('.cell-rec').focus();
+    }
+  });
+  tdSym.appendChild(sel);
+  tr.appendChild(tdSym);
+
+  // Record
+  const tdRec = document.createElement('td');
+  tdRec.className = 'col-rec';
+  const wrap = document.createElement('div');
+  wrap.className = 'rec-cell-wrap';
+
+  const recDiv = document.createElement('div');
+  recDiv.className = 'cell-rec';
+  recDiv.contentEditable = 'true';
+  recDiv.spellcheck = false;
+
+  if (row.text) recDiv.appendChild(document.createTextNode(row.text));
+  (row.images || []).forEach(src => {
+    recDiv.appendChild(createImageEl(src, row));
+  });
+
+  recDiv.addEventListener('input', () => {
+    syncRowFromDiv(row, recDiv);
+    if (!row.timestamped && (row.text.trim().length > 0 || row.images.length > 0)) {
+      const t = nowTime();
+      row.time = t;
+      row.timestamped = true;
+      inpTime.value = t;
+    }
+    saveState();
+  });
+  recDiv.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      moveToNextRow(parseInt(tr.dataset.idx, 10));
+    }
+  });
+  recDiv.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (text) document.execCommand('insertText', false, text);
+  });
+  wrap.appendChild(recDiv);
+
+  // Photo button
+  const photoBtn = document.createElement('button');
+  photoBtn.className = 'btn-photo';
+  photoBtn.textContent = '画像';
+  photoBtn.title = '画像を追加';
+  photoBtn.addEventListener('click', () => {
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.addEventListener('change', ev => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = re => {
+        const dataUrl = re.target.result;
+        row.images.push(dataUrl);
+        recDiv.appendChild(createImageEl(dataUrl, row));
+        if (!row.timestamped) {
+          const t = nowTime();
+          row.time = t;
+          row.timestamped = true;
+          inpTime.value = t;
+        }
+        saveState();
+      };
+      reader.readAsDataURL(file);
+    });
+    fi.click();
+  });
+  wrap.appendChild(photoBtn);
+
+  tdRec.appendChild(wrap);
+  tr.appendChild(tdRec);
+  return tr;
+}
+function createImageEl(src, row) {
+  const wrap = document.createElement('span');
+  wrap.className = 'img-wrap';
+  wrap.contentEditable = 'false';
+  const img = document.createElement('img');
+  img.src = src;
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'img-del';
+  del.textContent = '×';
+  del.title = 'この画像を削除';
+  del.addEventListener('click', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!confirm('この画像を削除しますか？')) return;
+    const i = row.images.indexOf(img.src);
+    if (i >= 0) row.images.splice(i, 1);
+    wrap.remove();
+    saveState();
+  });
+  del.addEventListener('mousedown', e => e.preventDefault());
+  wrap.appendChild(img);
+  wrap.appendChild(del);
+  return wrap;
+}
+function syncRowFromDiv(row, div) {
+  let text = '';
+  div.childNodes.forEach(n => {
+    if (n.nodeType === Node.TEXT_NODE) text += n.textContent;
+    else if (n.nodeName === 'BR') text += '\n';
+    else if (n.nodeName === 'DIV' || n.nodeName === 'P')
+      text += (text && !text.endsWith('\n') ? '\n' : '') + n.textContent;
+  });
+  row.text = text;
+  const imgs = div.querySelectorAll('img');
+  row.images = Array.from(imgs).map(im => im.src);
+}
+function applyRowColor(tr, symbol) {
+  ['sym-light-pink', 'sym-dark-pink', 'sym-white', 'sym-light-blue', 'sym-dark-blue']
+    .forEach(c => tr.classList.remove(c));
+  tr.classList.add(SYM_CLASS[symbol] || 'sym-white');
+}
+
+/* ===== Row management ===== */
+function appendRows(n) {
+  const cur = getCurrentEntry();
+  const tbody = document.getElementById('tbody');
+  let added = 0;
+  for (let i = 0; i < n; i++) {
+    if (cur.rows.length >= MAX_ROWS) break;
+    const r = newRow();
+    cur.rows.push(r);
+    tbody.appendChild(buildRowEl(r, cur.rows.length - 1));
+    added++;
+  }
+  if (added > 0) saveState();
+  return added;
+}
+function deleteRow(idx) {
+  const cur = getCurrentEntry();
+  if (idx < 0 || idx >= cur.rows.length) return;
+  cur.rows.splice(idx, 1);
+  if (cur.rows.length === 0) cur.rows.push(newRow());
+  renderTable();
+  saveState();
+}
+function moveToNextRow(currentIdx) {
+  const cur = getCurrentEntry();
+  let nextIdx = currentIdx + 1;
+  if (nextIdx >= cur.rows.length) {
+    appendRows(1);
+  }
+  const tbody = document.getElementById('tbody');
+  const nextTr = tbody.children[nextIdx];
+  if (nextTr) {
+    const recDiv = nextTr.querySelector('.cell-rec');
+    if (recDiv) recDiv.focus();
+  }
+}
+
+/* ===== Sentinel observer (auto-add 10 rows on scroll) ===== */
+let sentinelObserver = null;
+function setupAutoAddObserver() {
+  const sentinel = document.getElementById('row-sentinel');
+  if (sentinelObserver) sentinelObserver.disconnect();
+  sentinelObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        appendRows(ROWS_PER_TRIGGER);
+      }
+    });
+  }, { rootMargin: '120px' });
+  sentinelObserver.observe(sentinel);
+}
+
+/* ===== New entry / history ===== */
+function newEntryConfirm() {
+  const cur = getCurrentEntry();
+  const msg = isEntryEmpty(cur)
+    ? '新規作成します。よろしいですか？'
+    : '現在のデータを履歴に保存して新規作成します。よろしいですか？';
+  if (!confirm(msg)) return;
+  // If current is empty, just reset it in place
+  if (isEntryEmpty(cur)) {
+    cur.header = { date: todayISO(), lesson: '', class: '' };
+    cur.rows = Array.from({ length: INITIAL_ROWS }, newRow);
+  } else {
+    // Create new entry; previous one stays in entries[]
+    const id = generateId();
+    state.entries.push(makeEmptyEntry(id));
+    state.currentId = id;
+  }
+  saveState();
+  renderHeader();
+  renderTable();
+  window.scrollTo(0, 0);
+}
+function openHistory() {
+  renderThemeGrid();
+  renderHistoryList();
+  document.getElementById('history-modal').classList.add('show');
+}
+function closeHistory() {
+  document.getElementById('history-modal').classList.remove('show');
+}
+function renderHistoryList() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '';
+  const items = state.entries
+    .filter(e => e.id !== state.currentId && !isEntryEmpty(e))
+    .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = '保存された記録はありません';
+    list.appendChild(empty);
+    return;
+  }
+  items.forEach(entry => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    const filledRows = entry.rows.filter(r => !isRowEmpty(r)).length;
+    const meta = document.createElement('div');
+    meta.className = 'history-meta';
+    meta.innerHTML =
+      `<span class="history-date">${entry.header.date || '日付未設定'}</span>` +
+      `<span class="history-lesson">${entry.header.lesson || '(授業名なし)'}</span>` +
+      `<span class="history-class">${entry.header.class || ''}</span>` +
+      `<span class="history-rows">${filledRows}行</span>`;
+    const actions = document.createElement('div');
+    actions.className = 'history-actions';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'edit';
+    editBtn.title = '編集';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', () => loadEntry(entry.id));
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del';
+    delBtn.title = '削除';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', () => deleteEntry(entry.id));
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    item.appendChild(meta);
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+function loadEntry(id) {
+  // Prune current if empty
+  const cur = getCurrentEntry();
+  if (cur && isEntryEmpty(cur)) {
+    state.entries = state.entries.filter(e => e.id !== state.currentId);
+  }
+  state.currentId = id;
+  saveState();
+  renderHeader();
+  renderTable();
+  closeHistory();
+  window.scrollTo(0, 0);
+}
+function deleteEntry(id) {
+  if (!confirm('この記録を削除します。よろしいですか？\n（元に戻せません）')) return;
+  state.entries = state.entries.filter(e => e.id !== id);
+  // If we deleted current somehow (shouldn't via UI), make sure current still exists
+  if (!state.entries.find(e => e.id === state.currentId)) {
+    if (state.entries.length === 0) {
+      const newId = generateId();
+      state.entries.push(makeEmptyEntry(newId));
+      state.currentId = newId;
+      renderHeader();
+      renderTable();
+    } else {
+      state.currentId = state.entries[0].id;
+      renderHeader();
+      renderTable();
+    }
+  }
+  saveState();
+  renderHistoryList();
+}
+
+/* ===== Print / export ===== */
+function markEmptyRows() {
+  const cur = getCurrentEntry();
+  const trs = document.querySelectorAll('#tbody tr');
+  trs.forEach((tr, i) => {
+    const r = cur.rows[i];
+    if (!r) return;
+    tr.classList.toggle('empty-row', isRowEmpty(r));
+  });
+}
+function unmarkEmptyRows() {
+  document.querySelectorAll('#tbody tr.empty-row').forEach(tr => tr.classList.remove('empty-row'));
+}
+function setupPrintHandlers() {
+  window.addEventListener('beforeprint', markEmptyRows);
+  window.addEventListener('afterprint', unmarkEmptyRows);
+}
+function doPrint() {
+  window.print();
+}
+
+function fileNameBase() {
+  const cur = getCurrentEntry();
+  const d = cur.header.date || 'no-date';
+  const l = cur.header.lesson || 'no-lesson';
+  const c = cur.header.class || '';
+  return ['授業記録', d, l, c].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g, '');
+}
+
+function exportExcel() {
+  const cur = getCurrentEntry();
+  const aoa = [
+    ['日付', cur.header.date, '授業名', cur.header.lesson, 'クラス', cur.header.class],
+    [],
+    ['時刻', '記号', '記録']
+  ];
+  const dataRowsInfo = [];
+  cur.rows.forEach(row => {
+    if (isRowEmpty(row)) return;
+    const imgNote = row.images.length > 0 ? `[画像${row.images.length}枚]` : '';
+    const text = (row.text || '').trim();
+    const combined = [text, imgNote].filter(Boolean).join(' ');
+    aoa.push([row.time, row.symbol, combined]);
+    dataRowsInfo.push({ symbol: row.symbol });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const headerStyle = {
+    font: { bold: true },
+    fill: { fgColor: { rgb: 'F0F0F0' }, patternType: 'solid' },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' }
+    }
+  };
+  ['A3', 'B3', 'C3'].forEach(addr => { if (ws[addr]) ws[addr].s = headerStyle; });
+  dataRowsInfo.forEach((info, i) => {
+    const r = 3 + i;
+    const hex = SYM_COLOR_HEX[info.symbol] || 'FFFFFF';
+    for (let c = 0; c < 3; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+      ws[addr].s = {
+        fill: { fgColor: { rgb: hex }, patternType: 'solid' },
+        alignment: { vertical: 'top', wrapText: true },
+        border: {
+          top: { style: 'thin' }, bottom: { style: 'thin' },
+          left: { style: 'thin' }, right: { style: 'thin' }
+        }
+      };
+    }
+  });
+  ws['!cols'] = [{ wch: 11 }, { wch: 6 }, { wch: 70 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '授業記録');
+  XLSX.writeFile(wb, fileNameBase() + '.xlsx');
+}
+
+function exportPDF() {
+  document.body.classList.add('exporting-pdf');
+  markEmptyRows();
+  const opt = {
+    margin: 6,
+    filename: fileNameBase() + '.pdf',
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    pagebreak: { mode: ['avoid-all', 'css'] }
+  };
+  html2pdf().set(opt).from(document.body).save().then(() => {
+    document.body.classList.remove('exporting-pdf');
+    unmarkEmptyRows();
+  }).catch(err => {
+    document.body.classList.remove('exporting-pdf');
+    unmarkEmptyRows();
+    alert('PDF生成に失敗しました: ' + err.message);
+  });
+}
+
+function exportJSON() {
+  const cur = getCurrentEntry();
+  const blob = new Blob([JSON.stringify(cur, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileNameBase() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!confirm('読み込んだ記録を履歴に追加します。よろしいですか？')) {
+    event.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const obj = JSON.parse(ev.target.result);
+      if (!obj.rows || !obj.header) throw new Error('フォーマットが不正です');
+      // Treat as a new entry, set as current
+      const id = generateId();
+      const entry = {
+        id,
+        savedAt: new Date().toISOString(),
+        header: obj.header,
+        rows: obj.rows
+      };
+      state.entries.push(entry);
+      state.currentId = id;
+      normalizeState();
+      saveState();
+      renderHeader();
+      renderTable();
+      alert('読み込みました');
+    } catch (e) {
+      alert('読み込み失敗: ' + e.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* ===== Init ===== */
+function init() {
+  loadAppState();
+  applyTheme(state.theme);
+  renderHeader();
+  bindHeaderInputs();
+  renderTable();
+  setupAutoAddObserver();
+  setupPrintHandlers();
+  saveState();
+}
+init();
+</script>
+</body>
+</html>
