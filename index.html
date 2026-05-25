@@ -676,6 +676,7 @@ body.exporting-pdf tr.empty-row { display: none !important; }
   <button class="primary" onclick="exportPDF()">PDF保存</button>
   <button onclick="exportJSON()">JSON保存</button>
   <button onclick="document.getElementById('json-input').click()">JSON読込</button>
+  <button onclick="issueShareURL()">URL発行</button>
   <button class="secondary" onclick="newEntryConfirm()">新規作成</button>
   <button class="secondary" onclick="openHistory()">履歴</button>
   <input type="file" id="json-input" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
@@ -692,6 +693,25 @@ body.exporting-pdf tr.empty-row { display: none !important; }
   <tbody id="tbody"></tbody>
 </table>
 <div id="row-sentinel"></div>
+
+<!-- Share URL modal -->
+<div class="modal-overlay" id="share-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>共有URL発行</h3>
+      <button class="modal-close" onclick="closeShareModal()" title="閉じる">×</button>
+    </div>
+    <div class="modal-section">
+      <p style="margin:0 0 8px 0">この授業記録を共有できるURLを発行しました。下記URLを送れば，相手のブラウザで同じ記録を開けます。</p>
+      <textarea id="share-url-text" readonly style="width:100%;min-height:120px;font-size:12px;font-family:monospace;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;word-break:break-all"></textarea>
+      <p id="share-len-note" style="font-size:12px;color:#666;margin:8px 0 0 0"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="primary" onclick="copyShareURL()">URLをコピー</button>
+      <button onclick="closeShareModal()">閉じる</button>
+    </div>
+  </div>
+</div>
 
 <!-- History / Theme modal -->
 <div class="modal-overlay" id="history-modal">
@@ -725,6 +745,7 @@ const ROWS_PER_TRIGGER = 10;
 const MAX_ROWS = 500;
 
 const SYMBOLS = ['', '◯', '⬤', '☆', '★'];
+const INSERT_OPTION = '__INSERT__';
 const DELETE_OPTION = '__DELETE__';
 const SYM_CLASS = {
   '': 'sym-white',
@@ -966,6 +987,11 @@ function buildRowEl(row, idx) {
     opt.textContent = s === '' ? '—' : s;
     sel.appendChild(opt);
   });
+  const insOpt = document.createElement('option');
+  insOpt.value = INSERT_OPTION;
+  insOpt.textContent = '挿入';
+  insOpt.style.color = '#0a7';
+  sel.appendChild(insOpt);
   const delOpt = document.createElement('option');
   delOpt.value = DELETE_OPTION;
   delOpt.textContent = '削除';
@@ -973,6 +999,11 @@ function buildRowEl(row, idx) {
   sel.appendChild(delOpt);
   sel.value = row.symbol || '';
   sel.addEventListener('change', e => {
+    if (e.target.value === INSERT_OPTION) {
+      insertRow(parseInt(tr.dataset.idx, 10));
+      e.target.value = row.symbol || '';
+      return;
+    }
     if (e.target.value === DELETE_OPTION) {
       if (confirm('このセルだけ削除します。よろしいですか？')) {
         deleteRow(parseInt(tr.dataset.idx, 10));
@@ -1133,6 +1164,21 @@ function deleteRow(idx) {
   if (cur.rows.length === 0) cur.rows.push(newRow());
   renderTable();
   saveState();
+}
+function insertRow(idx) {
+  const cur = getCurrentEntry();
+  if (idx < 0 || idx > cur.rows.length) return;
+  if (cur.rows.length >= MAX_ROWS) return;
+  cur.rows.splice(idx, 0, newRow());
+  renderTable();
+  saveState();
+  // Focus the record cell of the newly inserted row
+  const tbody = document.getElementById('tbody');
+  const newTr = tbody.children[idx];
+  if (newTr) {
+    const recDiv = newTr.querySelector('.cell-rec');
+    if (recDiv) recDiv.focus();
+  }
 }
 function moveToNextRow(currentIdx) {
   const cur = getCurrentEntry();
@@ -1416,10 +1462,134 @@ function importJSON(event) {
   reader.readAsText(file);
 }
 
+/* ===== Share URL ===== */
+function b64urlEncode(uint8) {
+  let bin = '';
+  for (let i = 0; i < uint8.length; i++) bin += String.fromCharCode(uint8[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlDecode(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+async function gzipString(text) {
+  if (typeof CompressionStream === 'undefined') {
+    return new TextEncoder().encode(text); // no compression fallback
+  }
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+  const buf = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buf);
+}
+async function gunzipToString(uint8) {
+  if (typeof DecompressionStream === 'undefined') {
+    return new TextDecoder().decode(uint8);
+  }
+  try {
+    const stream = new Blob([uint8]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  } catch (e) {
+    return new TextDecoder().decode(uint8);
+  }
+}
+async function issueShareURL() {
+  const cur = getCurrentEntry();
+  const data = { header: cur.header, rows: cur.rows };
+  const json = JSON.stringify(data);
+  let encoded;
+  try {
+    const gz = await gzipString(json);
+    encoded = 'gz.' + b64urlEncode(gz);
+  } catch (e) {
+    encoded = 'pl.' + b64urlEncode(new TextEncoder().encode(json));
+  }
+  const base = location.origin + location.pathname + location.search;
+  const url = base + '#share=' + encoded;
+  document.getElementById('share-url-text').value = url;
+  const len = url.length;
+  const note = document.getElementById('share-len-note');
+  let msg = 'URLの長さ：約 ' + len.toLocaleString() + ' 文字';
+  if (len > 30000) {
+    msg += '（⚠ 非常に長いです。メールやLINEでは送れない場合があります。画像が多い場合はJSON保存→共有をご検討ください）';
+    note.style.color = '#c00';
+  } else if (len > 8000) {
+    msg += '（⚠ やや長めです。送信先によっては切れる場合があります）';
+    note.style.color = '#c80';
+  } else {
+    note.style.color = '#666';
+  }
+  note.textContent = msg;
+  document.getElementById('share-modal').classList.add('show');
+  setTimeout(() => {
+    const ta = document.getElementById('share-url-text');
+    ta.focus();
+    ta.select();
+  }, 50);
+}
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('show');
+}
+async function copyShareURL() {
+  const ta = document.getElementById('share-url-text');
+  const url = ta.value;
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('URLをコピーしました');
+  } catch (e) {
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy');
+      alert('URLをコピーしました');
+    } catch (err) {
+      alert('自動コピーに失敗しました。テキストボックスを選択して手動でコピーしてください。');
+    }
+  }
+}
+async function loadShareFromHash() {
+  const m = (location.hash || '').match(/#share=([^&]+)/);
+  if (!m) return false;
+  const raw = m[1];
+  let scheme = 'gz', payload = raw;
+  if (raw.startsWith('gz.')) { scheme = 'gz'; payload = raw.slice(3); }
+  else if (raw.startsWith('pl.')) { scheme = 'pl'; payload = raw.slice(3); }
+  try {
+    const bytes = b64urlDecode(payload);
+    const json = scheme === 'gz' ? await gunzipToString(bytes) : new TextDecoder().decode(bytes);
+    const data = JSON.parse(json);
+    if (!data.header || !data.rows) throw new Error('フォーマットが不正です');
+    if (!confirm('共有された授業記録を履歴に追加して表示します。よろしいですか？')) {
+      history.replaceState(null, '', location.pathname + location.search);
+      return false;
+    }
+    const id = generateId();
+    const entry = {
+      id,
+      savedAt: new Date().toISOString(),
+      header: data.header,
+      rows: data.rows
+    };
+    state.entries.push(entry);
+    state.currentId = id;
+    normalizeState();
+    saveState();
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  } catch (e) {
+    alert('共有URLの読み込みに失敗しました：' + e.message);
+    history.replaceState(null, '', location.pathname + location.search);
+    return false;
+  }
+}
+
 /* ===== Init ===== */
-function init() {
+async function init() {
   loadAppState();
   applyTheme(state.theme);
+  await loadShareFromHash();
   renderHeader();
   bindHeaderInputs();
   renderTable();
