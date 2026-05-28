@@ -1873,21 +1873,21 @@ async function exportExcel() {
       const xlRow = ws.getRow(rowNum);
       xlRow.height = totalH * 0.75;
 
-      // 画像を配置：tl + br で「セル内の正確な範囲」を指定
-      // col: 2 が列Cの左端，2 + (sidePad / colCWidthPx) を画像の左
-      // row: (rowNum - 1) が行の上端，分数 = 行内の縦位置 / 行全体高さ
+      // 画像を配置：tl(左上アンカー) + ext(ピクセル指定) で配置する。
+      // ext.width / ext.height は実ピクセル幅・高さをそのまま反映するため，
+      // セル幅(maxImgW)・行高(totalH)に収まるよう上で調整済みのサイズが
+      // そのまま正確に描画される（twoCell の br 指定は ExcelJS の内部列幅
+      // 推定がExcel実値と異なり画像が極端に小さくなるため使わない）。
+      // tl.col = 2 が列Cの左端。小数部 = 列内の横位置の割合。
+      // tl.row = (rowNum - 1) が行の上端。小数部 = 行内の縦位置の割合。
       let offsetY = topPad + textH + gap;
       for (const s of sizes) {
         const base64 = s.src.replace(/^data:image\/[^;]+;base64,/, '');
         const imgId = wb.addImage({ base64, extension: s.ext });
-        const tlColFrac = sidePad / colCWidthPx;
-        const brColFrac = (sidePad + s.w) / colCWidthPx;
-        const tlRowFrac = offsetY / totalH;
-        const brRowFrac = (offsetY + s.h) / totalH;
         ws.addImage(imgId, {
-          tl: { col: 2 + tlColFrac, row: (rowNum - 1) + tlRowFrac },
-          br: { col: 2 + brColFrac, row: (rowNum - 1) + brRowFrac },
-          editAs: 'twoCell',
+          tl: { col: 2 + sidePad / colCWidthPx, row: (rowNum - 1) + offsetY / totalH },
+          ext: { width: s.w, height: s.h },
+          editAs: 'oneCell',
         });
         offsetY += s.h + gap;
       }
