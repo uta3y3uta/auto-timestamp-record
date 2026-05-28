@@ -1829,33 +1829,65 @@ async function exportExcel() {
     });
 
     if (Array.isArray(row.images) && row.images.length > 0) {
-      // 各画像のサイズを取得
+      // 列Cのおおよそのピクセル幅（既定フォント Calibri 11px ≈ 7px/char）
+      const colCWidthPx = 70 * 7; // ≈ 490 px
+      const sidePad = 8;
+      const maxImgW = colCWidthPx - sidePad * 2; // セル内に収める最大幅
+
+      // 各画像の自然サイズを取得し，セル幅に収まるよう調整
       const sizes = [];
       for (const it of row.images) {
         const src = typeof it === 'string' ? it : it.src;
-        const dispW = (typeof it === 'object' && it.width) ? it.width : null;
+        const reqW = (typeof it === 'object' && it.width) ? it.width : null;
         const nat = await _loadImageNatural(src);
-        const w = dispW || Math.min(220, nat.w);
-        const h = nat.h * (w / nat.w);
+        let w = reqW || Math.min(220, nat.w);
+        let h = nat.h * (w / nat.w);
+        // セル幅超過時は等比縮小
+        if (w > maxImgW) {
+          h = h * (maxImgW / w);
+          w = maxImgW;
+        }
         sizes.push({ src, w, h, ext: _detectImgExt(src) });
       }
+
       // 縦に積み重ね（テキストの下）
       const gap = 6;
+      const topPad = 4;
+      const botPad = 4;
       const textLines = ((row.text || '').match(/\n/g) || []).length + 1;
       const textH = Math.max(textLines * 18, 4);
-      const totalImgH = sizes.reduce((s, x) => s + x.h, 0) + gap * (sizes.length - 1);
-      const totalH = textH + 8 + totalImgH; // ピクセル
-      ws.getRow(rowNum).height = totalH * 0.75; // 1px ≈ 0.75pt
+      let totalImgH = sizes.reduce((s, x) => s + x.h, 0) + gap * Math.max(0, sizes.length - 1);
+      let totalH = topPad + textH + gap + totalImgH + botPad; // セル内全体の高さ（px）
 
-      let offsetY = textH + 8;
+      // Excel の行高上限（≈ 409pt = 545px）を超える場合は画像を等比縮小
+      const MAX_ROW_PX = 540;
+      if (totalH > MAX_ROW_PX) {
+        const availForImg = Math.max(20, MAX_ROW_PX - topPad - textH - gap - botPad);
+        const scale = availForImg / totalImgH;
+        sizes.forEach(s => { s.w *= scale; s.h *= scale; });
+        totalImgH = sizes.reduce((s, x) => s + x.h, 0) + gap * Math.max(0, sizes.length - 1);
+        totalH = topPad + textH + gap + totalImgH + botPad;
+      }
+
+      // 行高をピクセルに合わせて設定（1px = 0.75pt）
+      const xlRow = ws.getRow(rowNum);
+      xlRow.height = totalH * 0.75;
+
+      // 画像を配置：tl + br で「セル内の正確な範囲」を指定
+      // col: 2 が列Cの左端，2 + (sidePad / colCWidthPx) を画像の左
+      // row: (rowNum - 1) が行の上端，分数 = 行内の縦位置 / 行全体高さ
+      let offsetY = topPad + textH + gap;
       for (const s of sizes) {
         const base64 = s.src.replace(/^data:image\/[^;]+;base64,/, '');
         const imgId = wb.addImage({ base64, extension: s.ext });
-        const rowFrac = offsetY / totalH;
+        const tlColFrac = sidePad / colCWidthPx;
+        const brColFrac = (sidePad + s.w) / colCWidthPx;
+        const tlRowFrac = offsetY / totalH;
+        const brRowFrac = (offsetY + s.h) / totalH;
         ws.addImage(imgId, {
-          tl: { col: 2.02, row: (rowNum - 1) + rowFrac },
-          ext: { width: s.w, height: s.h },
-          editAs: 'oneCell',
+          tl: { col: 2 + tlColFrac, row: (rowNum - 1) + tlRowFrac },
+          br: { col: 2 + brColFrac, row: (rowNum - 1) + brRowFrac },
+          editAs: 'twoCell',
         });
         offsetY += s.h + gap;
       }
