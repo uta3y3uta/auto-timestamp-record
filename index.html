@@ -797,6 +797,18 @@ function nowTime() {
 function newRow() {
   return { time: '', symbol: '', text: '', images: [], timestamped: false };
 }
+/* 入力（テキスト・画像）が初めて入ったときに時刻を自動で刻む */
+function ensureTimestamp(row, inpTime) {
+  if (row.timestamped) return false;
+  const hasText = (row.text || '').trim().length > 0;
+  const hasImage = (row.images || []).length > 0;
+  if (!hasText && !hasImage) return false;
+  const t = nowTime();
+  row.time = t;
+  row.timestamped = true;
+  if (inpTime) inpTime.value = t;
+  return true;
+}
 function makeEmptyEntry(id) {
   return {
     id: id || generateId(),
@@ -1043,12 +1055,7 @@ function buildRowEl(row, idx) {
 
   recDiv.addEventListener('input', () => {
     syncRowFromDiv(row, recDiv);
-    if (!row.timestamped && (row.text.trim().length > 0 || row.images.length > 0)) {
-      const t = nowTime();
-      row.time = t;
-      row.timestamped = true;
-      inpTime.value = t;
-    }
+    ensureTimestamp(row, inpTime);
     saveState();
   });
   recDiv.addEventListener('keydown', e => {
@@ -1058,8 +1065,21 @@ function buildRowEl(row, idx) {
     }
   });
   recDiv.addEventListener('paste', e => {
+    const cd = e.clipboardData || window.clipboardData;
+    if (!cd) return;
+    // 画像クリップボード貼り付け対応（スクショなど）。複数枚もOK。
+    const imgItems = Array.from(cd.items || []).filter(it => it.type && it.type.startsWith('image/'));
+    if (imgItems.length > 0) {
+      e.preventDefault();
+      imgItems.forEach(it => {
+        const file = it.getAsFile();
+        if (!file) return;
+        addImageToRow(file, row, recDiv, inpTime);
+      });
+      return;
+    }
     e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const text = cd.getData('text');
     if (text) document.execCommand('insertText', false, text);
   });
   wrap.appendChild(recDiv);
@@ -1074,22 +1094,8 @@ function buildRowEl(row, idx) {
     fi.type = 'file';
     fi.accept = 'image/*';
     fi.addEventListener('change', ev => {
-      const file = ev.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = re => {
-        const dataUrl = re.target.result;
-        row.images.push(dataUrl);
-        recDiv.appendChild(createImageEl(dataUrl, row));
-        if (!row.timestamped) {
-          const t = nowTime();
-          row.time = t;
-          row.timestamped = true;
-          inpTime.value = t;
-        }
-        saveState();
-      };
-      reader.readAsDataURL(file);
+      const files = Array.from(ev.target.files || []);
+      files.forEach(file => addImageToRow(file, row, recDiv, inpTime));
     });
     fi.click();
   });
@@ -1098,6 +1104,19 @@ function buildRowEl(row, idx) {
   tdRec.appendChild(wrap);
   tr.appendChild(tdRec);
   return tr;
+}
+/* 画像ファイルを行に追加し，タイムスタンプも刻む（ボタン経由でもペースト経由でも共通） */
+function addImageToRow(file, row, recDiv, inpTime) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = re => {
+    const dataUrl = re.target.result;
+    row.images.push(dataUrl);
+    recDiv.appendChild(createImageEl(dataUrl, row));
+    ensureTimestamp(row, inpTime);
+    saveState();
+  };
+  reader.readAsDataURL(file);
 }
 function createImageEl(src, row) {
   const wrap = document.createElement('span');
