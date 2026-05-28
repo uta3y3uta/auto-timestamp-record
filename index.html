@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>授業記録シート</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <style>
 * { box-sizing: border-box; }
@@ -442,6 +443,29 @@ th.col-sym, td.col-sym { width: 60px; }
 .img-edit { top: -8px; right: 18px; background: #2a7; }
 .img-edit:hover { background: #186; }
 
+/* Inline resize handle (drag from bottom-right of image) */
+.img-resize {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  background: #2a7;
+  border: 2px solid white;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  color: white;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.img-resize:hover { background: #186; }
+
 /* Image editor modal */
 .img-edit-stage {
   position: relative;
@@ -688,7 +712,7 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 /* ===== Print + PDF export ===== */
 @media print {
   body { background: white; padding: 0; color: #000; }
-  .toolbar, .btn-photo, .img-del, .img-edit { display: none !important; }
+  .toolbar, .btn-photo, .img-del, .img-edit, .img-resize { display: none !important; }
   .header {
     border: none;
     padding: 0 0 8px 0;
@@ -715,7 +739,8 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 body.exporting-pdf .toolbar,
 body.exporting-pdf .btn-photo,
 body.exporting-pdf .img-del,
-body.exporting-pdf .img-edit { display: none !important; }
+body.exporting-pdf .img-edit,
+body.exporting-pdf .img-resize { display: none !important; }
 body.exporting-pdf tr.empty-row { display: none !important; }
 </style>
 </head>
@@ -1280,9 +1305,58 @@ function createImageEl(item, row) {
     saveState();
   });
   del.addEventListener('mousedown', e => e.preventDefault());
+  // セル上で直接サイズ変更できるリサイズハンドル（右下）
+  const resize = document.createElement('span');
+  resize.className = 'img-resize';
+  resize.title = 'ドラッグでサイズ変更';
+  resize.textContent = '⇲';
+  resize.contentEditable = 'false';
+  let resizeDrag = null;
+  const onResizeMove = e => {
+    if (!resizeDrag) return;
+    const dx = e.clientX - resizeDrag.startX;
+    let newW = Math.round(resizeDrag.startW + dx);
+    const maxW = Math.max(resizeDrag.natW || 1200, 1200);
+    newW = Math.max(40, Math.min(newW, maxW));
+    img.style.width = newW + 'px';
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    img.dataset.dispWidth = String(newW);
+    // 状態にも逐次反映
+    const recDivLocal = wrap.closest('.cell-rec');
+    if (recDivLocal) {
+      const idx = Array.from(recDivLocal.querySelectorAll('img')).indexOf(img);
+      if (idx >= 0 && row.images[idx]) {
+        row.images[idx] = { src: img.src, width: newW };
+      }
+    }
+  };
+  const onResizeEnd = e => {
+    if (!resizeDrag) return;
+    try { resize.releasePointerCapture(e.pointerId); } catch (_) {}
+    resizeDrag = null;
+    saveState();
+  };
+  resize.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = img.getBoundingClientRect();
+    resizeDrag = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: rect.width,
+      natW: img.naturalWidth || 0,
+    };
+    try { resize.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  resize.addEventListener('pointermove', onResizeMove);
+  resize.addEventListener('pointerup', onResizeEnd);
+  resize.addEventListener('pointercancel', onResizeEnd);
+  resize.addEventListener('mousedown', e => e.preventDefault());
   wrap.appendChild(img);
   wrap.appendChild(edit);
   wrap.appendChild(del);
+  wrap.appendChild(resize);
   return wrap;
 }
 function syncRowFromDiv(row, div) {
@@ -1696,53 +1770,115 @@ function fileNameBase() {
   return ['授業記録', d, l, c].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g, '');
 }
 
-function exportExcel() {
+function _loadImageNatural(src) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res({ w: im.naturalWidth || 220, h: im.naturalHeight || 160 });
+    im.onerror = () => res({ w: 220, h: 160 });
+    im.src = src;
+  });
+}
+function _detectImgExt(dataUrl) {
+  const m = /^data:image\/([a-zA-Z0-9]+)/.exec(dataUrl || '');
+  if (!m) return 'png';
+  const ext = m[1].toLowerCase();
+  if (ext === 'jpg') return 'jpeg';
+  return ext;
+}
+async function exportExcel() {
+  if (typeof ExcelJS === 'undefined') {
+    alert('Excel 書き出しに必要なライブラリ（ExcelJS）の読み込みに失敗しました。');
+    return;
+  }
   const cur = getCurrentEntry();
-  const aoa = [
-    ['日付', cur.header.date, '授業名', cur.header.lesson, 'クラス', cur.header.class],
-    [],
-    ['時刻', '記号', '記録']
-  ];
-  const dataRowsInfo = [];
-  cur.rows.forEach(row => {
-    if (isRowEmpty(row)) return;
-    const imgNote = row.images.length > 0 ? `[画像${row.images.length}枚]` : '';
-    const text = (row.text || '').trim();
-    const combined = [text, imgNote].filter(Boolean).join(' ');
-    aoa.push([row.time, row.symbol, combined]);
-    dataRowsInfo.push({ symbol: row.symbol });
-  });
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const headerStyle = {
-    font: { bold: true },
-    fill: { fgColor: { rgb: 'F0F0F0' }, patternType: 'solid' },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('授業記録');
+  ws.columns = [{ width: 11 }, { width: 6 }, { width: 70 }];
+
+  // ヘッダー情報（1行目）
+  ws.addRow(['日付', cur.header.date || '', '授業名', cur.header.lesson || '', 'クラス', cur.header.class || '']);
+  // 空行（2行目）
+  ws.addRow([]);
+  // 列ヘッダー（3行目）
+  ws.addRow(['時刻', '記号', '記録']);
+  const headerStyle = c => {
+    c.font = { bold: true };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+    c.alignment = { horizontal: 'center', vertical: 'center' };
+    c.border = {
       top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' }
-    }
+      left: { style: 'thin' }, right: { style: 'thin' },
+    };
   };
-  ['A3', 'B3', 'C3'].forEach(addr => { if (ws[addr]) ws[addr].s = headerStyle; });
-  dataRowsInfo.forEach((info, i) => {
-    const r = 3 + i;
-    const hex = SYM_COLOR_HEX[info.symbol] || 'FFFFFF';
-    for (let c = 0; c < 3; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) ws[addr] = { v: '', t: 's' };
-      ws[addr].s = {
-        fill: { fgColor: { rgb: hex }, patternType: 'solid' },
-        alignment: { vertical: 'top', wrapText: true },
-        border: {
-          top: { style: 'thin' }, bottom: { style: 'thin' },
-          left: { style: 'thin' }, right: { style: 'thin' }
-        }
+  ['A3', 'B3', 'C3'].forEach(a => headerStyle(ws.getCell(a)));
+
+  // データ行
+  const filledRows = cur.rows.filter(r => !isRowEmpty(r));
+  for (const row of filledRows) {
+    const xlRow = ws.addRow([row.time || '', row.symbol || '', row.text || '']);
+    const rowNum = xlRow.number;
+    const hex = (SYM_COLOR_HEX[row.symbol] || 'FFFFFF');
+    ['A', 'B', 'C'].forEach(col => {
+      const c = ws.getCell(col + rowNum);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + hex } };
+      c.alignment = { vertical: 'top', wrapText: true, horizontal: col === 'B' ? 'center' : 'left' };
+      c.border = {
+        top: { style: 'thin' }, bottom: { style: 'thin' },
+        left: { style: 'thin' }, right: { style: 'thin' },
       };
+    });
+
+    if (Array.isArray(row.images) && row.images.length > 0) {
+      // 各画像のサイズを取得
+      const sizes = [];
+      for (const it of row.images) {
+        const src = typeof it === 'string' ? it : it.src;
+        const dispW = (typeof it === 'object' && it.width) ? it.width : null;
+        const nat = await _loadImageNatural(src);
+        const w = dispW || Math.min(220, nat.w);
+        const h = nat.h * (w / nat.w);
+        sizes.push({ src, w, h, ext: _detectImgExt(src) });
+      }
+      // 縦に積み重ね（テキストの下）
+      const gap = 6;
+      const textLines = ((row.text || '').match(/\n/g) || []).length + 1;
+      const textH = Math.max(textLines * 18, 4);
+      const totalImgH = sizes.reduce((s, x) => s + x.h, 0) + gap * (sizes.length - 1);
+      const totalH = textH + 8 + totalImgH; // ピクセル
+      ws.getRow(rowNum).height = totalH * 0.75; // 1px ≈ 0.75pt
+
+      let offsetY = textH + 8;
+      for (const s of sizes) {
+        const base64 = s.src.replace(/^data:image\/[^;]+;base64,/, '');
+        const imgId = wb.addImage({ base64, extension: s.ext });
+        const rowFrac = offsetY / totalH;
+        ws.addImage(imgId, {
+          tl: { col: 2.02, row: (rowNum - 1) + rowFrac },
+          ext: { width: s.w, height: s.h },
+          editAs: 'oneCell',
+        });
+        offsetY += s.h + gap;
+      }
     }
-  });
-  ws['!cols'] = [{ wch: 11 }, { wch: 6 }, { wch: 70 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '授業記録');
-  XLSX.writeFile(wb, fileNameBase() + '.xlsx');
+  }
+
+  // ダウンロード
+  try {
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileNameBase() + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+  } catch (e) {
+    console.error(e);
+    alert('Excel書き出しに失敗しました：' + e.message);
+  }
 }
 
 function exportPDF() {
