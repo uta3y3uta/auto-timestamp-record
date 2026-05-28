@@ -813,7 +813,7 @@ function makeEmptyEntry(id) {
   return {
     id: id || generateId(),
     savedAt: new Date().toISOString(),
-    header: { date: todayISO(), lesson: '', class: '' },
+    header: { date: todayISO(), lesson: '', class: '', dateUserSet: false },
     rows: Array.from({ length: INITIAL_ROWS }, newRow)
   };
 }
@@ -878,7 +878,9 @@ function normalizeState() {
   if (!Array.isArray(state.entries)) state.entries = [];
   state.entries.forEach(entry => {
     if (!entry.id) entry.id = generateId();
-    if (!entry.header) entry.header = { date: todayISO(), lesson: '', class: '' };
+    if (!entry.header) entry.header = { date: todayISO(), lesson: '', class: '', dateUserSet: true };
+    // 後方互換：既存データは「ユーザーが日付を設定済み」とみなして自動更新しない
+    if (typeof entry.header.dateUserSet !== 'boolean') entry.header.dateUserSet = true;
     if (!Array.isArray(entry.rows)) entry.rows = [];
     entry.rows.forEach(r => {
       if (typeof r.text !== 'string') r.text = '';
@@ -947,6 +949,8 @@ function bindHeaderInputs() {
     el.addEventListener('input', e => {
       const cur = getCurrentEntry();
       cur.header[key] = e.target.value;
+      // 日付をユーザーが選んだら，以降は自動更新しない
+      if (key === 'date') cur.header.dateUserSet = true;
       saveState();
     });
   });
@@ -1237,7 +1241,7 @@ function newEntryConfirm() {
   if (!confirm(msg)) return;
   // If current is empty, just reset it in place
   if (isEntryEmpty(cur)) {
-    cur.header = { date: todayISO(), lesson: '', class: '' };
+    cur.header = { date: todayISO(), lesson: '', class: '', dateUserSet: false };
     cur.rows = Array.from({ length: INITIAL_ROWS }, newRow);
   } else {
     // Create new entry; previous one stays in entries[]
@@ -1609,6 +1613,11 @@ async function init() {
   loadAppState();
   applyTheme(state.theme);
   await loadShareFromHash();
+  // 起動時：現在の記録の日付をユーザーが選択していなければ「今日」に更新
+  const cur = getCurrentEntry();
+  if (cur && cur.header && !cur.header.dateUserSet) {
+    cur.header.date = todayISO();
+  }
   renderHeader();
   bindHeaderInputs();
   renderTable();
