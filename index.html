@@ -1066,6 +1066,12 @@ function buildRowEl(row, idx) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       moveToNextRow(parseInt(tr.dataset.idx, 10));
+    } else if (e.key === 'Tab') {
+      // Tabは横（画像ボタン）ではなく，下（次の記録セル）へ
+      e.preventDefault();
+      const idx = parseInt(tr.dataset.idx, 10);
+      if (e.shiftKey) moveToPrevRow(idx);
+      else moveToNextRow(idx);
     }
   });
   recDiv.addEventListener('paste', e => {
@@ -1213,6 +1219,15 @@ function moveToNextRow(currentIdx) {
   const nextTr = tbody.children[nextIdx];
   if (nextTr) {
     const recDiv = nextTr.querySelector('.cell-rec');
+    if (recDiv) recDiv.focus();
+  }
+}
+function moveToPrevRow(currentIdx) {
+  if (currentIdx <= 0) return;
+  const tbody = document.getElementById('tbody');
+  const prevTr = tbody.children[currentIdx - 1];
+  if (prevTr) {
+    const recDiv = prevTr.querySelector('.cell-rec');
     if (recDiv) recDiv.focus();
   }
 }
