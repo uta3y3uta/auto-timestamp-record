@@ -420,19 +420,16 @@ th.col-sym, td.col-sym { width: 60px; }
   border-radius: 2px;
   display: block;
 }
-.img-del {
+.img-del, .img-edit {
   position: absolute;
-  top: -8px;
-  right: -8px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #d33;
   color: white;
   border: 2px solid white;
   font-weight: bold;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   padding: 0;
   display: flex;
@@ -440,7 +437,66 @@ th.col-sym, td.col-sym { width: 60px; }
   justify-content: center;
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
+.img-del { top: -8px; right: -8px; background: #d33; font-size: 14px; }
 .img-del:hover { background: #b00; }
+.img-edit { top: -8px; right: 18px; background: #2a7; }
+.img-edit:hover { background: #186; }
+
+/* Image editor modal */
+.img-edit-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 auto;
+  user-select: none;
+  touch-action: none;
+}
+.img-edit-stage img {
+  display: block;
+  max-width: 100%;
+  pointer-events: none;
+}
+.img-edit-cropbox {
+  position: absolute;
+  border: 2px dashed #fff;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+  cursor: move;
+  box-sizing: border-box;
+}
+.img-edit-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border: 2px solid #2a7;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.img-edit-handle.nw { top: -8px; left: -8px; cursor: nwse-resize; }
+.img-edit-handle.ne { top: -8px; right: -8px; cursor: nesw-resize; }
+.img-edit-handle.sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
+.img-edit-handle.se { bottom: -8px; right: -8px; cursor: nwse-resize; }
+.img-edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.img-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.img-edit-row input[type="range"] { flex: 1; }
+.img-edit-row .val { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.img-edit-stage-wrap {
+  display: flex;
+  justify-content: center;
+  background: #222;
+  padding: 20px;
+  border-radius: 6px;
+}
 .btn-photo {
   padding: 2px 8px;
   background: var(--btn-bg);
@@ -632,7 +688,7 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 /* ===== Print + PDF export ===== */
 @media print {
   body { background: white; padding: 0; color: #000; }
-  .toolbar, .btn-photo, .img-del { display: none !important; }
+  .toolbar, .btn-photo, .img-del, .img-edit { display: none !important; }
   .header {
     border: none;
     padding: 0 0 8px 0;
@@ -658,7 +714,8 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 }
 body.exporting-pdf .toolbar,
 body.exporting-pdf .btn-photo,
-body.exporting-pdf .img-del { display: none !important; }
+body.exporting-pdf .img-del,
+body.exporting-pdf .img-edit { display: none !important; }
 body.exporting-pdf tr.empty-row { display: none !important; }
 </style>
 </head>
@@ -709,6 +766,46 @@ body.exporting-pdf tr.empty-row { display: none !important; }
     <div class="modal-actions">
       <button class="primary" onclick="copyShareURL()">URLをコピー</button>
       <button onclick="closeShareModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image editor modal -->
+<div class="modal-overlay" id="img-edit-modal">
+  <div class="modal" style="max-width:880px">
+    <div class="modal-header">
+      <h3>画像を編集（サイズ変更・トリミング）</h3>
+      <button class="modal-close" onclick="closeImageEditor()" title="閉じる">×</button>
+    </div>
+    <div class="modal-section">
+      <div class="img-edit-stage-wrap">
+        <div class="img-edit-stage" id="img-edit-stage">
+          <img id="img-edit-img" alt="">
+          <div class="img-edit-cropbox" id="img-edit-cropbox">
+            <div class="img-edit-handle nw" data-h="nw"></div>
+            <div class="img-edit-handle ne" data-h="ne"></div>
+            <div class="img-edit-handle sw" data-h="sw"></div>
+            <div class="img-edit-handle se" data-h="se"></div>
+          </div>
+        </div>
+      </div>
+      <div class="img-edit-controls">
+        <div class="img-edit-row">
+          <label for="img-edit-size" style="min-width:80px">表示の幅</label>
+          <input type="range" id="img-edit-size" min="60" max="220" step="2">
+          <span class="val" id="img-edit-size-val">220px</span>
+        </div>
+        <div class="img-edit-row" style="color:var(--text-muted);font-size:12px">
+          ・点線の枠をドラッグするとトリミング範囲を変えられます。<br>
+          ・スライダーで表示する大きさを変えられます。<br>
+          ・「リセット」で元の画像に戻せます。
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button onclick="resetImageEditor()">リセット</button>
+      <button onclick="closeImageEditor()">キャンセル</button>
+      <button class="primary" onclick="applyImageEditor()">適用</button>
     </div>
   </div>
 </div>
@@ -885,6 +982,15 @@ function normalizeState() {
     entry.rows.forEach(r => {
       if (typeof r.text !== 'string') r.text = '';
       if (!Array.isArray(r.images)) r.images = [];
+      // 画像は {src, width} オブジェクトで保持。旧仕様（文字列）も受け入れて変換。
+      r.images = r.images.map(it => {
+        if (typeof it === 'string') return { src: it, width: null };
+        if (it && typeof it === 'object' && typeof it.src === 'string') {
+          const w = parseInt(it.width, 10);
+          return { src: it.src, width: isFinite(w) && w > 0 ? w : null };
+        }
+        return null;
+      }).filter(Boolean);
       if (typeof r.symbol !== 'string') r.symbol = '';
       if (typeof r.time !== 'string') r.time = '';
       if (typeof r.timestamped !== 'boolean') r.timestamped = !!r.time;
@@ -1053,8 +1159,8 @@ function buildRowEl(row, idx) {
   recDiv.spellcheck = false;
 
   if (row.text) recDiv.appendChild(document.createTextNode(row.text));
-  (row.images || []).forEach(src => {
-    recDiv.appendChild(createImageEl(src, row));
+  (row.images || []).forEach(item => {
+    recDiv.appendChild(createImageEl(item, row));
   });
 
   recDiv.addEventListener('input', () => {
@@ -1121,19 +1227,43 @@ function addImageToRow(file, row, recDiv, inpTime) {
   const reader = new FileReader();
   reader.onload = re => {
     const dataUrl = re.target.result;
-    row.images.push(dataUrl);
-    recDiv.appendChild(createImageEl(dataUrl, row));
+    const item = { src: dataUrl, width: null };
+    row.images.push(item);
+    recDiv.appendChild(createImageEl(item, row));
     ensureTimestamp(row, inpTime);
     saveState();
   };
   reader.readAsDataURL(file);
 }
-function createImageEl(src, row) {
+function createImageEl(item, row) {
+  // 後方互換：item は string か {src, width} のどちらでも受け付ける
+  const src = typeof item === 'string' ? item : item.src;
+  const width = typeof item === 'string' ? null : (item.width || null);
+
   const wrap = document.createElement('span');
   wrap.className = 'img-wrap';
   wrap.contentEditable = 'false';
   const img = document.createElement('img');
   img.src = src;
+  if (width) {
+    img.style.width = width + 'px';
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    img.dataset.dispWidth = String(width);
+  }
+  // 編集ボタン（サイズ変更・トリミング）
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'img-edit';
+  edit.textContent = '✎';
+  edit.title = 'サイズ変更・トリミング';
+  edit.addEventListener('click', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    openImageEditor(img, row);
+  });
+  edit.addEventListener('mousedown', e => e.preventDefault());
+  // 削除ボタン
   const del = document.createElement('button');
   del.type = 'button';
   del.className = 'img-del';
@@ -1143,13 +1273,15 @@ function createImageEl(src, row) {
     e.stopPropagation();
     e.preventDefault();
     if (!confirm('この画像を削除しますか？')) return;
-    const i = row.images.indexOf(img.src);
+    const i = row.images.findIndex(it =>
+      (typeof it === 'string' ? it : it.src) === img.src);
     if (i >= 0) row.images.splice(i, 1);
     wrap.remove();
     saveState();
   });
   del.addEventListener('mousedown', e => e.preventDefault());
   wrap.appendChild(img);
+  wrap.appendChild(edit);
   wrap.appendChild(del);
   return wrap;
 }
@@ -1163,7 +1295,10 @@ function syncRowFromDiv(row, div) {
   });
   row.text = text;
   const imgs = div.querySelectorAll('img');
-  row.images = Array.from(imgs).map(im => im.src);
+  row.images = Array.from(imgs).map(im => {
+    const w = parseInt(im.dataset.dispWidth || '', 10);
+    return { src: im.src, width: isFinite(w) && w > 0 ? w : null };
+  });
 }
 function applyRowColor(tr, symbol) {
   ['sym-light-pink', 'sym-dark-pink', 'sym-white', 'sym-light-blue', 'sym-dark-blue']
@@ -1245,6 +1380,184 @@ function setupAutoAddObserver() {
     });
   }, { rootMargin: '120px' });
   sentinelObserver.observe(sentinel);
+}
+
+/* ===== Image editor (resize + crop) ===== */
+const imgEditor = {
+  row: null,
+  imgEl: null,
+  origSrc: '',
+  natW: 0,
+  natH: 0,
+  crop: { x: 0, y: 0, w: 0, h: 0 }, // 元画像のピクセル座標
+  width: 220,                       // 表示幅（px）
+};
+function clampN(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function openImageEditor(imgEl, row) {
+  imgEditor.row = row;
+  imgEditor.imgEl = imgEl;
+  imgEditor.origSrc = imgEl.src;
+
+  // 現在の表示幅を取得（インライン → 実測の順）
+  let curW = parseInt(imgEl.dataset.dispWidth || '', 10);
+  if (!isFinite(curW) || curW <= 0) {
+    curW = imgEl.getBoundingClientRect().width || 220;
+  }
+
+  const stageImg = document.getElementById('img-edit-img');
+  stageImg.onload = () => {
+    imgEditor.natW = stageImg.naturalWidth;
+    imgEditor.natH = stageImg.naturalHeight;
+    // クロップの初期値 = 画像全体
+    imgEditor.crop = { x: 0, y: 0, w: imgEditor.natW, h: imgEditor.natH };
+    // 表示幅スライダーの設定（最小40 / 最大は自然幅と600のうち大きい方）
+    imgEditor.width = Math.round(Math.min(curW || 220, imgEditor.natW));
+    const slider = document.getElementById('img-edit-size');
+    slider.min = 40;
+    slider.max = Math.max(imgEditor.natW, 600);
+    slider.value = imgEditor.width;
+    document.getElementById('img-edit-size-val').textContent = imgEditor.width + 'px';
+    // モーダル表示後にレイアウト（getBoundingClientRect のため）
+    requestAnimationFrame(layoutCropbox);
+  };
+  stageImg.src = imgEditor.origSrc;
+  document.getElementById('img-edit-modal').classList.add('show');
+}
+
+function layoutCropbox() {
+  const stageImg = document.getElementById('img-edit-img');
+  const box = document.getElementById('img-edit-cropbox');
+  if (!stageImg.offsetWidth) return;
+  const scale = stageImg.offsetWidth / imgEditor.natW;
+  box.style.left   = (imgEditor.crop.x * scale) + 'px';
+  box.style.top    = (imgEditor.crop.y * scale) + 'px';
+  box.style.width  = (imgEditor.crop.w * scale) + 'px';
+  box.style.height = (imgEditor.crop.h * scale) + 'px';
+}
+
+function resetImageEditor() {
+  if (!imgEditor.natW) return;
+  imgEditor.crop = { x: 0, y: 0, w: imgEditor.natW, h: imgEditor.natH };
+  imgEditor.width = Math.min(220, imgEditor.natW);
+  const slider = document.getElementById('img-edit-size');
+  slider.value = imgEditor.width;
+  document.getElementById('img-edit-size-val').textContent = imgEditor.width + 'px';
+  // 元画像から再読み込み（複数回トリミングしても劣化しない）
+  const stageImg = document.getElementById('img-edit-img');
+  if (stageImg.src !== imgEditor.origSrc) stageImg.src = imgEditor.origSrc;
+  layoutCropbox();
+}
+
+function closeImageEditor() {
+  document.getElementById('img-edit-modal').classList.remove('show');
+  imgEditor.row = null;
+  imgEditor.imgEl = null;
+}
+
+function applyImageEditor() {
+  if (!imgEditor.row || !imgEditor.imgEl) return;
+  const c = imgEditor.crop;
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.max(1, Math.round(c.w));
+  canvas.height = Math.max(1, Math.round(c.h));
+  const ctx = canvas.getContext('2d');
+  const source = new Image();
+  source.onload = () => {
+    ctx.drawImage(source, c.x, c.y, c.w, c.h, 0, 0, canvas.width, canvas.height);
+    let newSrc;
+    try {
+      // PNG は元の品質を保つが容量が大きい。JPEG は容量を抑えられる。
+      // 元が JPEG ならそれに合わせる。
+      const type = /^data:image\/jpeg/.test(imgEditor.origSrc) ? 'image/jpeg' : 'image/png';
+      newSrc = canvas.toDataURL(type, 0.92);
+    } catch (e) {
+      newSrc = canvas.toDataURL();
+    }
+    // 行データ更新（DOM 順にもとづいて該当インデックスを探す）
+    const recDiv = imgEditor.imgEl.closest('.cell-rec');
+    const idx = Array.from(recDiv.querySelectorAll('img')).indexOf(imgEditor.imgEl);
+    if (idx >= 0) {
+      imgEditor.row.images[idx] = { src: newSrc, width: imgEditor.width };
+    }
+    // DOM 反映
+    imgEditor.imgEl.src = newSrc;
+    imgEditor.imgEl.style.width    = imgEditor.width + 'px';
+    imgEditor.imgEl.style.maxWidth = 'none';
+    imgEditor.imgEl.style.maxHeight = 'none';
+    imgEditor.imgEl.dataset.dispWidth = String(imgEditor.width);
+    saveState();
+    closeImageEditor();
+  };
+  source.src = imgEditor.origSrc;
+}
+
+function setupImageEditorUI() {
+  // スライダー
+  const slider = document.getElementById('img-edit-size');
+  slider.addEventListener('input', e => {
+    imgEditor.width = parseInt(e.target.value, 10) || imgEditor.width;
+    document.getElementById('img-edit-size-val').textContent = imgEditor.width + 'px';
+  });
+  // 画像読込後に再レイアウト
+  window.addEventListener('resize', () => {
+    if (document.getElementById('img-edit-modal').classList.contains('show')) layoutCropbox();
+  });
+  // クロップ枠ドラッグ（移動・四隅リサイズ）
+  const box = document.getElementById('img-edit-cropbox');
+  const stageImg = document.getElementById('img-edit-img');
+  let drag = null;
+  box.addEventListener('pointerdown', e => {
+    const handle = e.target.closest('.img-edit-handle');
+    const scale = stageImg.offsetWidth / imgEditor.natW;
+    drag = {
+      mode: handle ? handle.dataset.h : 'move',
+      startX: e.clientX, startY: e.clientY,
+      origCrop: { ...imgEditor.crop },
+      scale,
+    };
+    e.preventDefault();
+    e.stopPropagation();
+    box.setPointerCapture(e.pointerId);
+  });
+  box.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = (e.clientX - drag.startX) / drag.scale;
+    const dy = (e.clientY - drag.startY) / drag.scale;
+    const o = drag.origCrop;
+    const min = 10; // 最小10pxの幅・高さ
+    let nc = { ...o };
+    const m = drag.mode;
+    if (m === 'move') {
+      nc.x = clampN(o.x + dx, 0, imgEditor.natW - o.w);
+      nc.y = clampN(o.y + dy, 0, imgEditor.natH - o.h);
+    } else {
+      if (m.includes('n')) {
+        const ny = clampN(o.y + dy, 0, o.y + o.h - min);
+        nc.h = o.h + (o.y - ny);
+        nc.y = ny;
+      }
+      if (m.includes('s')) {
+        nc.h = clampN(o.h + dy, min, imgEditor.natH - o.y);
+      }
+      if (m.includes('w')) {
+        const nx = clampN(o.x + dx, 0, o.x + o.w - min);
+        nc.w = o.w + (o.x - nx);
+        nc.x = nx;
+      }
+      if (m.includes('e')) {
+        nc.w = clampN(o.w + dx, min, imgEditor.natW - o.x);
+      }
+    }
+    imgEditor.crop = nc;
+    layoutCropbox();
+  });
+  const endDrag = e => {
+    drag = null;
+    try { box.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  box.addEventListener('pointerup', endDrag);
+  box.addEventListener('pointercancel', endDrag);
 }
 
 /* ===== New entry / history ===== */
@@ -1638,6 +1951,7 @@ async function init() {
   renderTable();
   setupAutoAddObserver();
   setupPrintHandlers();
+  setupImageEditorUI();
   saveState();
 }
 init();
