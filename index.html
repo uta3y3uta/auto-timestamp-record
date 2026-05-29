@@ -686,6 +686,12 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 .history-actions button.edit { color: var(--btn-primary-bg); }
 .history-actions button.del { color: #d33; }
 .history-actions button:hover { filter: brightness(0.95); }
+.history-item.current { border-color: var(--btn-primary-bg); }
+.history-current-badge {
+  font-size: 11px; font-weight: bold;
+  color: #fff; background: var(--btn-primary-bg);
+  padding: 2px 8px; border-radius: 10px;
+}
 
 .note {
   font-size: 12px;
@@ -1667,9 +1673,15 @@ function closeHistory() {
 function renderHistoryList() {
   const list = document.getElementById('history-list');
   list.innerHTML = '';
+  // 空でない全記録（編集中も含む）を対象にする。
+  // 並びは savedAt 降順だが，編集中の記録は常に先頭に固定する。
   const items = state.entries
-    .filter(e => e.id !== state.currentId && !isEntryEmpty(e))
-    .sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
+    .filter(e => !isEntryEmpty(e))
+    .sort((a, b) => {
+      if (a.id === state.currentId) return -1;
+      if (b.id === state.currentId) return 1;
+      return (b.savedAt || '').localeCompare(a.savedAt || '');
+    });
   if (items.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'history-empty';
@@ -1678,32 +1690,41 @@ function renderHistoryList() {
     return;
   }
   items.forEach(entry => {
+    const isCurrent = entry.id === state.currentId;
     const item = document.createElement('div');
-    item.className = 'history-item';
+    item.className = 'history-item' + (isCurrent ? ' current' : '');
     const filledRows = entry.rows.filter(r => !isRowEmpty(r)).length;
     const meta = document.createElement('div');
     meta.className = 'history-meta';
     meta.innerHTML =
+      (isCurrent ? '<span class="history-current-badge">編集中</span>' : '') +
       `<span class="history-date">${entry.header.date || '日付未設定'}</span>` +
       `<span class="history-lesson">${entry.header.lesson || '(授業名なし)'}</span>` +
       `<span class="history-class">${entry.header.class || ''}</span>` +
       `<span class="history-rows">${filledRows}行</span>`;
-    const actions = document.createElement('div');
-    actions.className = 'history-actions';
-    const editBtn = document.createElement('button');
-    editBtn.className = 'edit';
-    editBtn.title = '編集';
-    editBtn.textContent = '✎';
-    editBtn.addEventListener('click', () => loadEntry(entry.id));
-    const delBtn = document.createElement('button');
-    delBtn.className = 'del';
-    delBtn.title = '削除';
-    delBtn.textContent = '×';
-    delBtn.addEventListener('click', () => deleteEntry(entry.id));
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
     item.appendChild(meta);
-    item.appendChild(actions);
+    if (isCurrent) {
+      // 編集中の記録：ボタンは出さず，クリックで編集画面へ戻る
+      item.style.cursor = 'pointer';
+      item.title = '編集画面に戻る';
+      item.addEventListener('click', () => closeHistory());
+    } else {
+      const actions = document.createElement('div');
+      actions.className = 'history-actions';
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit';
+      editBtn.title = '編集';
+      editBtn.textContent = '✎';
+      editBtn.addEventListener('click', () => loadEntry(entry.id));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del';
+      delBtn.title = '削除';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', () => deleteEntry(entry.id));
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+      item.appendChild(actions);
+    }
     list.appendChild(item);
   });
 }
