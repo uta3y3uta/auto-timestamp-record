@@ -1090,20 +1090,15 @@ function normalizeState() {
     }
   }
 }
-let _saveErrorShown = false;
 function saveState() {
   const cur = getCurrentEntry();
   if (cur) cur.savedAt = new Date().toISOString();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    _saveErrorShown = false;
   } catch (e) {
     console.warn('保存失敗（容量超過の可能性）:', e);
-    // 容量超過などで保存できないときは見えるかたちで警告（データ消失の原因になるため）
-    if (!_saveErrorShown) {
-      _saveErrorShown = true;
-      showToast('⚠ 自動保存できませんでした。写真が多すぎて容量オーバーの可能性があります。今すぐPDFやExcelで記録を取り出してください。', 'error', 12000);
-    }
+    // 容量いっぱいで保存できないときは，履歴超過時と同じ取り出し警告を出す（毎回出す＝force）
+    warnExport('自動保存できませんでした。容量がいっぱいです。', true);
   }
 }
 
@@ -1121,6 +1116,17 @@ function showToast(msg, type, duration) {
   el.className = 'toast show' + (type === 'error' ? ' toast-error' : '');
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { el.className = 'toast'; }, duration || 5000);
+}
+
+/* 容量いっぱい・履歴上限超過など，データ消失のおそれがある場面で共通の取り出し警告を出す。
+   理由（reason）に応じて前半の文を変え，後半の取り出しうながし文は常に同じにする。 */
+let _exportWarnShown = false;
+function warnExport(reason, force) {
+  // 1セッションに何度も出すとうるさいので原則1回。容量オーバーなど深刻なものはforceで再表示。
+  if (_exportWarnShown && !force) return;
+  _exportWarnShown = true;
+  const tail = '写真が多いと容量がいっぱいになり，古い記録が消えてしまうことがあります。大切な記録は，今のうちにPDFやExcel・JSONで取り出しましたか？';
+  showToast('⚠ ' + reason + tail, 'error', 14000);
 }
 
 /* ===== Theme ===== */
@@ -2339,11 +2345,14 @@ async function snapshotVersion() {
     });
     _lastVerSig = sig;
     await pruneVersions();
-  } catch (e) { console.warn('変更履歴の保存に失敗:', e); }
+  } catch (e) {
+    console.warn('変更履歴の保存に失敗:', e);
+    // IndexedDBも容量いっぱいで版を保存できない → 同じ取り出し警告を出す（毎回＝force）
+    warnExport('変更履歴を保存できませんでした。容量がいっぱいです。', true);
+  }
 }
 
 /* 50件超過分（古い版）を削除し，参照されなくなった画像を回収 */
-let _pruneWarnShown = false;
 async function pruneVersions() {
   const keys = await _idbGetAllKeys('versions');
   if (keys.length <= VERSION_MAX) return;
@@ -2353,11 +2362,8 @@ async function pruneVersions() {
     toDelete.forEach(k => s.delete(k));
   });
   await gcImages();
-  // 古い版を上書き・削除した → データ取り出しをうながす警告（1セッション1回）
-  if (!_pruneWarnShown) {
-    _pruneWarnShown = true;
-    showToast('変更履歴が' + VERSION_MAX + '件を超えたため，いちばん古い版から上書き・削除しています。大切な記録はPDFやExcel・JSONで取り出しましたか？', 'error', 12000);
-  }
+  // 古い版を上書き・削除した → データ取り出しをうながす警告（共通文・1セッション1回）
+  warnExport('変更履歴が' + VERSION_MAX + '件を超え，いちばん古い版から上書き・削除しています。', false);
 }
 async function gcImages() {
   const versions = await _idbGetAll('versions');
