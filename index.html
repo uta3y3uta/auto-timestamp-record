@@ -692,6 +692,40 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
   color: #fff; background: var(--btn-primary-bg);
   padding: 2px 8px; border-radius: 10px;
 }
+.version-toggle {
+  padding: 8px 16px; border-radius: 4px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg); color: var(--btn-text);
+  cursor: pointer; font-size: 14px; font-weight: 600;
+}
+.version-toggle:hover { filter: brightness(0.95); }
+.version-list {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 8px; max-height: 320px; overflow-y: auto;
+}
+.version-item {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 8px 10px; background: var(--bg);
+  border: 1px solid var(--panel-border); border-radius: 4px;
+  cursor: pointer;
+}
+.version-item:hover { filter: brightness(0.97); border-color: var(--btn-primary-bg); }
+.version-time { font-weight: bold; font-size: 13px; white-space: nowrap; }
+.version-lesson { font-size: 13px; flex: 1; }
+.version-rows { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.confirm-overlay { z-index: 1100; }
+.confirm-box { max-width: 360px; text-align: center; }
+.confirm-msg { font-size: 15px; margin: 4px 0 18px; }
+.confirm-actions { display: flex; gap: 10px; justify-content: center; }
+.confirm-actions button {
+  min-width: 84px; padding: 8px 16px; border-radius: 4px;
+  border: 1px solid var(--btn-border); background: var(--btn-bg);
+  color: var(--btn-text); cursor: pointer; font-size: 14px; font-weight: 600;
+}
+.confirm-actions button.primary {
+  background: var(--btn-primary-bg); color: var(--btn-primary-text);
+  border-color: var(--btn-primary-bg);
+}
 
 .note {
   font-size: 12px;
@@ -852,6 +886,13 @@ body.exporting-pdf tr.empty-row { display: none !important; }
     <div class="modal-section">
       <h4>テーマ</h4>
       <div class="theme-grid" id="theme-grid"></div>
+    </div>
+
+    <div class="modal-section">
+      <h4>変更履歴</h4>
+      <button id="version-toggle" class="version-toggle" onclick="toggleVersionHistory()">変更履歴を表示</button>
+      <p class="note">3分ごとに自動保存された版を最大100件まで保ちます。1件を選ぶとその版に復元できます。</p>
+      <div class="version-list" id="version-list" style="display:none"></div>
     </div>
 
     <div class="modal-section">
@@ -1665,6 +1706,12 @@ function newEntryConfirm() {
 function openHistory() {
   renderThemeGrid();
   renderHistoryList();
+  // 変更履歴は毎回たたんだ状態にリセット
+  const vl = document.getElementById('version-list');
+  if (vl) { vl.style.display = 'none'; vl.innerHTML = ''; }
+  const vt = document.getElementById('version-toggle');
+  if (vt) vt.textContent = '変更履歴を表示';
+  snapshotVersion(); // 開いた時点の最新状態を版として確保
   document.getElementById('history-modal').classList.add('show');
 }
 function closeHistory() {
@@ -2126,6 +2173,251 @@ async function loadShareFromHash() {
 }
 
 /* ===== Init ===== */
+/* ===== 変更履歴（自動保存スナップショット）=====
+   IndexedDB に保存。画像はハッシュで重複排除（同じ写真は1回だけ保持）。
+   3分間隔で「変化があった時だけ」記録し，最大100件で古い版を自動削除。
+   → 本体の localStorage は肥大化せず，版を重ねても容量を無駄に食わない。 */
+const VERSION_DB = 'lessonRecordVersionDB';
+const VERSION_MAX = 100;
+const AUTOSAVE_INTERVAL_MS = 3 * 60 * 1000; // 3分
+let _verDbPromise = null;
+let _lastVerSig = null;
+let _autosaveTimer = null;
+
+function verDb() {
+  if (_verDbPromise) return _verDbPromise;
+  _verDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(VERSION_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('versions')) {
+        db.createObjectStore('versions', { keyPath: 'seq', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('images')) {
+        db.createObjectStore('images', { keyPath: 'hash' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return _verDbPromise;
+}
+function _idbReq(req) {
+  return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+}
+function _idbWrite(stores, fn) {
+  return verDb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(stores, 'readwrite');
+    fn(tx);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  }));
+}
+async function _idbGetAll(store) {
+  const db = await verDb();
+  return _idbReq(db.transaction(store).objectStore(store).getAll());
+}
+async function _idbGetAllKeys(store) {
+  const db = await verDb();
+  return _idbReq(db.transaction(store).objectStore(store).getAllKeys());
+}
+/* 高速文字列ハッシュ（cyrb53）— 画像の重複排除キーに使用 */
+function cyrb53(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/* 現在の記録をスナップショット保存（変化があった時だけ） */
+async function snapshotVersion() {
+  try {
+    if (!('indexedDB' in window)) return;
+    const cur = getCurrentEntry();
+    if (!cur || isEntryEmpty(cur)) return;
+    const imagesToStore = {}; // hash -> dataURL
+    const rows = cur.rows.filter(r => !isRowEmpty(r)).map(r => ({
+      time: r.time || '', symbol: r.symbol || '', text: r.text || '',
+      timestamped: !!r.timestamped,
+      images: (r.images || []).map(it => {
+        const src = typeof it === 'string' ? it : it.src;
+        const width = (it && typeof it === 'object') ? (it.width || null) : null;
+        const hash = cyrb53(src);
+        imagesToStore[hash] = src;
+        return { hash, width };
+      })
+    }));
+    const header = {
+      date: cur.header.date || '', lesson: cur.header.lesson || '',
+      class: cur.header.class || '', dateUserSet: cur.header.dateUserSet !== false
+    };
+    const sig = cyrb53(JSON.stringify({ id: cur.id, header, rows }));
+    if (sig === _lastVerSig) return; // 変化なし → 保存しない（容量を無駄にしない）
+
+    const ts = new Date().toISOString();
+    await _idbWrite(['versions', 'images'], tx => {
+      const iStore = tx.objectStore('images');
+      Object.keys(imagesToStore).forEach(h => {
+        const g = iStore.get(h);
+        g.onsuccess = () => { if (!g.result) iStore.put({ hash: h, src: imagesToStore[h] }); };
+      });
+      tx.objectStore('versions').add({ ts, entryId: cur.id, header, rows, sig });
+    });
+    _lastVerSig = sig;
+    await pruneVersions();
+  } catch (e) { console.warn('変更履歴の保存に失敗:', e); }
+}
+
+/* 100件超過分（古い版）を削除し，参照されなくなった画像を回収 */
+async function pruneVersions() {
+  const keys = await _idbGetAllKeys('versions');
+  if (keys.length <= VERSION_MAX) return;
+  const toDelete = keys.slice().sort((a, b) => a - b).slice(0, keys.length - VERSION_MAX);
+  await _idbWrite('versions', tx => {
+    const s = tx.objectStore('versions');
+    toDelete.forEach(k => s.delete(k));
+  });
+  await gcImages();
+}
+async function gcImages() {
+  const versions = await _idbGetAll('versions');
+  const used = new Set();
+  versions.forEach(v => (v.rows || []).forEach(r => (r.images || []).forEach(im => used.add(im.hash))));
+  const imgKeys = await _idbGetAllKeys('images');
+  const orphans = imgKeys.filter(k => !used.has(k));
+  if (orphans.length) {
+    await _idbWrite('images', tx => {
+      const s = tx.objectStore('images');
+      orphans.forEach(k => s.delete(k));
+    });
+  }
+}
+
+function fmtVerTime(iso) {
+  const d = new Date(iso);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function toggleVersionHistory() {
+  const list = document.getElementById('version-list');
+  const btn = document.getElementById('version-toggle');
+  const show = list.style.display === 'none';
+  list.style.display = show ? '' : 'none';
+  btn.textContent = show ? '変更履歴を隠す' : '変更履歴を表示';
+  if (show) renderVersionList();
+}
+
+async function renderVersionList() {
+  const list = document.getElementById('version-list');
+  list.innerHTML = '';
+  let versions = [];
+  try { versions = await _idbGetAll('versions'); }
+  catch (e) { console.warn(e); }
+  versions.sort((a, b) => b.seq - a.seq);
+  if (versions.length === 0) {
+    const e = document.createElement('div');
+    e.className = 'history-empty';
+    e.textContent = '自動保存された版はまだありません';
+    list.appendChild(e);
+    return;
+  }
+  versions.forEach(v => {
+    const item = document.createElement('div');
+    item.className = 'version-item';
+    const filled = (v.rows || []).filter(r =>
+      !(!r.time && !r.symbol && !(r.text || '').trim() && (!r.images || r.images.length === 0))
+    ).length;
+    item.innerHTML =
+      `<span class="version-time">${fmtVerTime(v.ts)}</span>` +
+      `<span class="version-lesson">${(v.header && v.header.lesson) || '(授業名なし)'}</span>` +
+      `<span class="version-rows">${filled}行</span>`;
+    item.title = 'この版を復元';
+    item.addEventListener('click', () => restoreVersion(v.seq));
+    list.appendChild(item);
+  });
+}
+
+/* はい / いいえ の確認ダイアログ（Promise<boolean>） */
+function askConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay show confirm-overlay';
+    overlay.innerHTML =
+      '<div class="modal confirm-box">' +
+      '<p class="confirm-msg"></p>' +
+      '<div class="confirm-actions">' +
+      '<button class="confirm-no">いいえ</button>' +
+      '<button class="primary confirm-yes">はい</button>' +
+      '</div></div>';
+    overlay.querySelector('.confirm-msg').textContent = message;
+    document.body.appendChild(overlay);
+    const done = val => { overlay.remove(); resolve(val); };
+    overlay.querySelector('.confirm-yes').addEventListener('click', () => done(true));
+    overlay.querySelector('.confirm-no').addEventListener('click', () => done(false));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(false); });
+  });
+}
+
+async function restoreVersion(seq) {
+  const ok = await askConfirm('この版を復元しますか？');
+  if (!ok) return;
+  try {
+    const db = await verDb();
+    const v = await _idbReq(db.transaction('versions').objectStore('versions').get(seq));
+    if (!v) { alert('この版が見つかりませんでした。'); return; }
+    // 画像を一括取得してハッシュ→dataURL の対応表を作る
+    const allImgs = await _idbGetAll('images');
+    const imgMap = {};
+    allImgs.forEach(o => { imgMap[o.hash] = o.src; });
+    const rows = (v.rows || []).map(r => ({
+      time: r.time || '', symbol: r.symbol || '', text: r.text || '',
+      timestamped: r.timestamped !== undefined ? !!r.timestamped : !!r.time,
+      images: (r.images || [])
+        .map(im => ({ src: imgMap[im.hash], width: im.width || null }))
+        .filter(x => x.src)
+    }));
+    while (rows.length < INITIAL_ROWS) rows.push(newRow());
+    // 同じ記録（entryId）があればそこへ復元，無ければ新規に作る
+    let target = state.entries.find(e => e.id === v.entryId);
+    if (!target) {
+      target = { id: v.entryId || generateId(), savedAt: new Date().toISOString(), header: {}, rows: [] };
+      state.entries.push(target);
+    }
+    target.header = {
+      date: (v.header && v.header.date) || '', lesson: (v.header && v.header.lesson) || '',
+      class: (v.header && v.header.class) || '', dateUserSet: !(v.header && v.header.dateUserSet === false)
+    };
+    target.rows = rows;
+    state.currentId = target.id;
+    _lastVerSig = null; // 復元後の状態は新しい版として記録され得る
+    saveState();
+    renderHeader();
+    renderTable();
+    closeHistory();
+    window.scrollTo(0, 0);
+  } catch (e) { console.warn(e); alert('復元に失敗しました：' + e.message); }
+}
+
+async function setupVersionHistory() {
+  try {
+    const versions = await _idbGetAll('versions');
+    if (versions.length) {
+      versions.sort((a, b) => b.seq - a.seq);
+      _lastVerSig = versions[0].sig || null;
+    }
+  } catch (e) { console.warn('IndexedDB を利用できません（変更履歴は無効）:', e); return; }
+  if (_autosaveTimer) clearInterval(_autosaveTimer);
+  _autosaveTimer = setInterval(snapshotVersion, AUTOSAVE_INTERVAL_MS);
+  snapshotVersion(); // 起動直後に最初の版を確保
+}
+
 async function init() {
   loadAppState();
   applyTheme(state.theme);
@@ -2142,6 +2434,7 @@ async function init() {
   setupPrintHandlers();
   setupImageEditorUI();
   saveState();
+  setupVersionHistory();
 }
 init();
 </script>
