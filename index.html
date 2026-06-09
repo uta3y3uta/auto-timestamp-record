@@ -727,6 +727,16 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
   border-color: var(--btn-primary-bg);
 }
 
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 200%);
+  max-width: min(560px, 92vw); z-index: 1200;
+  background: #323232; color: #fff; padding: 14px 18px; border-radius: 8px;
+  font-size: 14px; line-height: 1.5; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  opacity: 0; transition: transform .3s ease, opacity .3s ease; pointer-events: none;
+}
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+.toast.toast-error { background: #b3261e; font-weight: 600; }
+
 .note {
   font-size: 12px;
   color: var(--text-muted);
@@ -891,7 +901,7 @@ body.exporting-pdf tr.empty-row { display: none !important; }
     <div class="modal-section">
       <h4>変更履歴</h4>
       <button id="version-toggle" class="version-toggle" onclick="toggleVersionHistory()">変更履歴を表示</button>
-      <p class="note">3分ごとに自動保存された版を最大100件まで保ちます。1件を選ぶとその版に復元できます。</p>
+      <p class="note">3分ごとに自動保存された版を最大50件まで保ちます。古い版は自動で上書き・削除されます。1件を選ぶとその版に復元できます。</p>
       <div class="version-list" id="version-list" style="display:none"></div>
     </div>
 
@@ -1080,14 +1090,37 @@ function normalizeState() {
     }
   }
 }
+let _saveErrorShown = false;
 function saveState() {
   const cur = getCurrentEntry();
   if (cur) cur.savedAt = new Date().toISOString();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    _saveErrorShown = false;
   } catch (e) {
     console.warn('保存失敗（容量超過の可能性）:', e);
+    // 容量超過などで保存できないときは見えるかたちで警告（データ消失の原因になるため）
+    if (!_saveErrorShown) {
+      _saveErrorShown = true;
+      showToast('⚠ 自動保存できませんでした。写真が多すぎて容量オーバーの可能性があります。今すぐPDFやExcelで記録を取り出してください。', 'error', 12000);
+    }
   }
+}
+
+/* ===== Toast（画面下の通知バー） ===== */
+let _toastTimer = null;
+function showToast(msg, type, duration) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast show' + (type === 'error' ? ' toast-error' : '');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = 'toast'; }, duration || 5000);
 }
 
 /* ===== Theme ===== */
@@ -2175,10 +2208,10 @@ async function loadShareFromHash() {
 /* ===== Init ===== */
 /* ===== 変更履歴（自動保存スナップショット）=====
    IndexedDB に保存。画像はハッシュで重複排除（同じ写真は1回だけ保持）。
-   3分間隔で「変化があった時だけ」記録し，最大100件で古い版を自動削除。
+   3分間隔で「変化があった時だけ」記録し，最大50件で古い版を自動削除（上書き）。
    → 本体の localStorage は肥大化せず，版を重ねても容量を無駄に食わない。 */
 const VERSION_DB = 'lessonRecordVersionDB';
-const VERSION_MAX = 100;
+const VERSION_MAX = 50;
 const AUTOSAVE_INTERVAL_MS = 3 * 60 * 1000; // 3分
 let _verDbPromise = null;
 let _lastVerSig = null;
@@ -2274,7 +2307,8 @@ async function snapshotVersion() {
   } catch (e) { console.warn('変更履歴の保存に失敗:', e); }
 }
 
-/* 100件超過分（古い版）を削除し，参照されなくなった画像を回収 */
+/* 50件超過分（古い版）を削除し，参照されなくなった画像を回収 */
+let _pruneWarnShown = false;
 async function pruneVersions() {
   const keys = await _idbGetAllKeys('versions');
   if (keys.length <= VERSION_MAX) return;
@@ -2284,6 +2318,11 @@ async function pruneVersions() {
     toDelete.forEach(k => s.delete(k));
   });
   await gcImages();
+  // 古い版を上書き・削除した → データ取り出しをうながす警告（1セッション1回）
+  if (!_pruneWarnShown) {
+    _pruneWarnShown = true;
+    showToast('変更履歴が' + VERSION_MAX + '件を超えたため，いちばん古い版から上書き・削除しています。大切な記録はPDFやExcel・JSONで取り出しましたか？', 'error', 12000);
+  }
 }
 async function gcImages() {
   const versions = await _idbGetAll('versions');
