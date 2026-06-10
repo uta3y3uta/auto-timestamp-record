@@ -2498,7 +2498,19 @@ async function setupVersionHistory() {
   snapshotVersion(); // 起動直後に最初の版を確保
 }
 
+/* ブラウザに「このデータを自動削除しないで」と申請する。
+   クロームブックなど空き容量が少ない端末での自動削除（eviction）を防ぐ安全網。
+   ※管理機の「サインアウト時にデータ消去」設定はブラウザ側からは防げない。 */
+async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    if (await navigator.storage.persisted()) return; // すでに永続化済み
+    await navigator.storage.persist();
+  } catch (e) { console.warn('永続ストレージの申請に失敗:', e); }
+}
+
 async function init() {
+  requestPersistentStorage();
   loadAppState();
   applyTheme(state.theme);
   await loadShareFromHash();
