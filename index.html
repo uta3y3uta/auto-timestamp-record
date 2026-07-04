@@ -730,12 +730,19 @@ tr.sym-light-blue td select, tr.sym-dark-blue td select { color: #1a1a1a; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 200%);
   max-width: min(560px, 92vw); z-index: 1200;
+  display: flex; align-items: flex-start; gap: 12px;
   background: #323232; color: #fff; padding: 14px 18px; border-radius: 8px;
   font-size: 14px; line-height: 1.5; box-shadow: 0 4px 16px rgba(0,0,0,.3);
   opacity: 0; transition: transform .3s ease, opacity .3s ease; pointer-events: none;
 }
-.toast.show { transform: translate(-50%, 0); opacity: 1; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
 .toast.toast-error { background: #b3261e; font-weight: 600; }
+.toast-msg { flex: 1 1 auto; }
+.toast-close {
+  flex: none; background: transparent; border: none; color: #fff;
+  font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; opacity: .85;
+}
+.toast-close:hover { opacity: 1; }
 
 .note {
   font-size: 12px;
@@ -1095,38 +1102,63 @@ function saveState() {
   if (cur) cur.savedAt = new Date().toISOString();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // 保存に成功したら警告を引っ込め，次に本当に容量オーバーしたとき再表示できるようにする
+    if (_exportWarnShowing) hideToast();
+    _exportWarnShowing = false;
+    _exportWarnDismissed = false;
   } catch (e) {
     console.warn('保存失敗（容量超過の可能性）:', e);
-    // 容量いっぱいで保存できないときは，履歴超過時と同じ取り出し警告を出す（毎回出す＝force）
-    warnExport('自動保存できませんでした。容量がいっぱいです。', true);
+    // 写真などで保存データが容量いっぱい → 取り出しをうながす警告（×で閉じられる）
+    warnExport('写真などで保存できる容量がいっぱいです。');
   }
 }
 
 /* ===== Toast（画面下の通知バー） ===== */
 let _toastTimer = null;
-function showToast(msg, type, duration) {
+function hideToast() {
+  const el = document.getElementById('toast');
+  if (el) el.className = 'toast';
+  if (_toastTimer) clearTimeout(_toastTimer);
+}
+/* duration: ミリ秒（0なら自動で消えない）。dismissible: true で×ボタンを付ける。 */
+function showToast(msg, type, duration, dismissible, onClose) {
   let el = document.getElementById('toast');
   if (!el) {
     el = document.createElement('div');
     el.id = 'toast';
-    el.className = 'toast';
     document.body.appendChild(el);
   }
-  el.textContent = msg;
   el.className = 'toast show' + (type === 'error' ? ' toast-error' : '');
+  el.innerHTML = '';
+  const span = document.createElement('span');
+  span.className = 'toast-msg';
+  span.textContent = msg;
+  el.appendChild(span);
+  if (dismissible) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-close';
+    btn.textContent = '×';
+    btn.title = '閉じる';
+    btn.addEventListener('click', () => { hideToast(); if (onClose) onClose(); });
+    el.appendChild(btn);
+  }
   if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => { el.className = 'toast'; }, duration || 5000);
+  if (duration) _toastTimer = setTimeout(() => { el.className = 'toast'; }, duration);
 }
 
-/* 容量いっぱい・履歴上限超過など，データ消失のおそれがある場面で共通の取り出し警告を出す。
-   理由（reason）に応じて前半の文を変え，後半の取り出しうながし文は常に同じにする。 */
-let _exportWarnShown = false;
-function warnExport(reason, force) {
-  // 1セッションに何度も出すとうるさいので原則1回。容量オーバーなど深刻なものはforceで再表示。
-  if (_exportWarnShown && !force) return;
-  _exportWarnShown = true;
-  const tail = '写真が多いと容量がいっぱいになり，古い記録が消えてしまうことがあります。大切な記録は，今のうちにPDFやExcel・JSONで取り出しましたか？';
-  showToast('⚠ ' + reason + tail, 'error', 14000);
+/* 写真などで保存データが容量いっぱいになったときの取り出し警告。
+   ×で閉じられ，閉じた後は保存が成功するまで再表示しない（うるさくしない）。 */
+let _exportWarnShowing = false;
+let _exportWarnDismissed = false;
+function warnExport(reason) {
+  if (_exportWarnDismissed || _exportWarnShowing) return;
+  _exportWarnShowing = true;
+  const tail = '大切な記録は，今のうちにPDFやExcel・JSONで取り出してください。';
+  // duration 0＝自動では消えない，×ボタンで閉じられる
+  showToast('⚠ ' + reason + tail, 'error', 0, true, () => {
+    _exportWarnDismissed = true;
+    _exportWarnShowing = false;
+  });
 }
 
 /* ===== Theme ===== */
@@ -1334,8 +1366,8 @@ function buildRowEl(row, idx) {
 }
 /* 画像を縮小・JPEG圧縮する（長辺をmaxEdgepx以下に）。容量を1/10以下に抑え，写真を多く貼れるようにする。
    失敗時（GIF/SVGなど）は元のdataUrlをそのまま返す。 */
-const IMG_MAX_EDGE = 1280;   // 長辺の上限（px）
-const IMG_QUALITY = 0.82;    // JPEG画質
+const IMG_MAX_EDGE = 900;    // 長辺の上限（px）。解像度を下げて容量を大きく削減
+const IMG_QUALITY = 0.6;     // JPEG画質。低めにして容量を小さく（授業記録の参照用途には十分）
 function compressImage(dataUrl) {
   return new Promise(resolve => {
     try {
@@ -2346,9 +2378,8 @@ async function snapshotVersion() {
     _lastVerSig = sig;
     await pruneVersions();
   } catch (e) {
+    // 自動保存（変更履歴）の容量オーバーは記録本体には影響しないので，警告は出さずログのみ
     console.warn('変更履歴の保存に失敗:', e);
-    // IndexedDBも容量いっぱいで版を保存できない → 同じ取り出し警告を出す（毎回＝force）
-    warnExport('変更履歴を保存できませんでした。容量がいっぱいです。', true);
   }
 }
 
@@ -2362,8 +2393,7 @@ async function pruneVersions() {
     toDelete.forEach(k => s.delete(k));
   });
   await gcImages();
-  // 古い版を上書き・削除した → データ取り出しをうながす警告（共通文・1セッション1回）
-  warnExport('変更履歴が' + VERSION_MAX + '件を超え，いちばん古い版から上書き・削除しています。', false);
+  // 50件超過の自動上書きは想定どおりの動作なので警告は出さない（モーダルの説明文で案内済み）
 }
 async function gcImages() {
   const versions = await _idbGetAll('versions');
